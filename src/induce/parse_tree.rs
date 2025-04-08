@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use nom::{
     IResult, Parser,
     branch::alt,
@@ -12,6 +14,28 @@ use nom::{
 pub struct ParseTree<T> {
     pub root: T,
     pub children: Vec<ParseTree<T>>,
+}
+
+impl<T: Display> Display for ParseTree<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseTree { root, children } if children.is_empty() => {
+                write!(f, "{}", root)
+            }
+            ParseTree { root, children } => {
+                write!(
+                    f,
+                    "({} {})",
+                    root,
+                    children
+                        .iter()
+                        .map(|e| e.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
+        }
+    }
 }
 
 fn atom(input: &str) -> IResult<&str, &str> {
@@ -44,7 +68,6 @@ pub fn element(input: &str) -> IResult<&str, ParseTree<&str>> {
         },
     ))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -145,6 +168,6 @@ mod tests {
                     ],
                 }
             ))
-        )
+        );
     }
 }
