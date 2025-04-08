@@ -14,15 +14,6 @@ pub struct ParseTree<T> {
     pub children: Vec<ParseTree<T>>,
 }
 
-impl<'a> From<&'a str> for ParseTree<&'a str> {
-    fn from(val: &'a str) -> Self {
-        ParseTree {
-            root: val,
-            children: vec![],
-        }
-    }
-}
-
 fn atom(input: &str) -> IResult<&str, &str> {
     delimited(space0, is_not(" ()"), space0).parse(input)
 }
@@ -38,7 +29,7 @@ fn elements(input: &str) -> IResult<&str, Vec<ParseTree<&str>>> {
     many1(delimited(space0, element, space0)).parse(input)
 }
 
-fn element(input: &str) -> IResult<&str, ParseTree<&str>> {
+pub fn element(input: &str) -> IResult<&str, ParseTree<&str>> {
     let (input, (name, elements)) = delimited(
         char('('),
         (atom, alt((elements, map(atom, str_to_parsetree_vec)))),
@@ -54,10 +45,6 @@ fn element(input: &str) -> IResult<&str, ParseTree<&str>> {
     ))
 }
 
-// fn parse_element(input: &str) -> IResult<&str, ParseTree<String>> {
-//     let ()
-//     Ok((input, ParseTree {}))
-// }
 
 #[cfg(test)]
 mod tests {
@@ -103,6 +90,8 @@ mod tests {
 
     #[test]
     fn element_test() {
+        assert!(element("(ROOT test test)").is_err());
+        assert!(element("(ROOT (test) (test))").is_err());
         assert_eq!(
             element("(ROOT hallo)"),
             Ok((
