@@ -16,6 +16,21 @@ pub struct ParseTree<T> {
     pub children: Vec<ParseTree<T>>,
 }
 
+impl<T> ParseTree<T> {
+    pub fn is_leaf(&self) -> bool {
+        self.children.is_empty()
+    }
+    pub fn execute_for_nodes<N>(&self, f: &mut N)
+    where
+        N: FnMut(&Self),
+    {
+        self.children.iter().for_each(|child| {
+            child.execute_for_nodes(f);
+            f(self);
+        });
+    }
+}
+
 impl<T: Display> Display for ParseTree<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
