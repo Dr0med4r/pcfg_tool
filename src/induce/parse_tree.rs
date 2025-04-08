@@ -35,8 +35,7 @@ fn str_to_parsetree_vec(input: &str) -> Vec<ParseTree<&str>> {
 }
 
 fn elements(input: &str) -> IResult<&str, Vec<ParseTree<&str>>> {
-    let (input, elements) = many1(element).parse(input)?;
-    Ok((input, elements))
+    many1(delimited(space0, element, space0)).parse(input)
 }
 
 fn element(input: &str) -> IResult<&str, ParseTree<&str>> {
@@ -74,6 +73,32 @@ mod tests {
         assert!(atom("(hallo").is_err());
         assert_eq!(atom(" \t hallo  "), Ok(("", "hallo")));
         assert_eq!(many1(atom).parse("hallo hi"), Ok(("", vec!["hallo", "hi"])));
+    }
+
+    #[test]
+    fn elements_test() {
+        assert_eq!(
+            elements("(ROOT hallo) (ROOT hallo)"),
+            Ok((
+                "",
+                vec![
+                    ParseTree {
+                        root: "ROOT",
+                        children: vec![ParseTree {
+                            root: "hallo",
+                            children: vec![],
+                        }],
+                    },
+                    ParseTree {
+                        root: "ROOT",
+                        children: vec![ParseTree {
+                            root: "hallo",
+                            children: vec![],
+                        }],
+                    },
+                ]
+            ))
+        );
     }
 
     #[test]
