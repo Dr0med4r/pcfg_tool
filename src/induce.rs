@@ -13,13 +13,13 @@ pub enum Rhs {
     NonTerminals(Vec<String>),
 }
 
-fn create_grammar(grammar: &mut HashMap<String, HashMap<Rhs, f64>>, tree: ParseTree<&str>) {
+fn create_grammar(grammar: &mut HashMap<String, HashMap<Rhs, u64>>, tree: ParseTree<&str>) {
     tree.execute_for_nodes(&mut |node| {
         if node.is_leaf() {
             return;
         }
         let non_terminal = node.root.to_string();
-        let body: &mut HashMap<Rhs, f64> = match grammar.get_mut(&non_terminal) {
+        let body: &mut HashMap<Rhs, u64> = match grammar.get_mut(&non_terminal) {
             Some(rhs) => rhs,
             None => {
                 grammar.insert(non_terminal.clone(), HashMap::new());
@@ -29,7 +29,6 @@ fn create_grammar(grammar: &mut HashMap<String, HashMap<Rhs, f64>>, tree: ParseT
             }
         };
         let child = node.children.first().expect("node should not be a leaf");
-        let factor = (body.len() as f64) / (body.len() as f64 + 1.0);
         // assumes that if the child is a leaf it is also a terminal
         let lhs = if child.is_leaf() {
             Rhs::Terminal(child.root.to_string())
@@ -41,27 +40,39 @@ fn create_grammar(grammar: &mut HashMap<String, HashMap<Rhs, f64>>, tree: ParseT
                 .collect();
             Rhs::NonTerminals(child_names)
         };
-        let probability: f64 = match body.get(&lhs) {
-            Some(&probability) => probability * factor + 1.0 / (body.len() as f64 + 1.0),
-            None => 1.0 / (body.len() as f64 + 1.0),
+        let probability: u64 = match body.get(&lhs) {
+            Some(&probability) => probability + 1,
+            None => 1,
         };
-        for v in (*body).values_mut() {
-            *v *= factor;
-        }
         body.insert(lhs, probability);
     });
 }
 
+fn transform_grammar(
+    absolute_grammar: HashMap<String, HashMap<Rhs, u64>>,
+) -> HashMap<String, HashMap<Rhs, f64>> {
+    let mut grammar = HashMap::new();
+    for (non_terminal, body) in absolute_grammar {
+        let mut new_body = HashMap::new();
+        let total = body.len() as f64;
+        for (item, count) in body {
+            new_body.insert(item, count as f64 / total);
+        }
+        grammar.insert(non_terminal, new_body);
+    }
+    grammar
+}
+
 pub fn induce_grammar() -> HashMap<String, HashMap<Rhs, f64>> {
-    let mut grammar: HashMap<String, HashMap<Rhs, f64>> = HashMap::new();
+    let mut absolute_grammar: HashMap<String, HashMap<Rhs, u64>> = HashMap::new();
     for line in io::stdin().lines() {
         let Ok(line) = line else { continue };
         let Ok((_, tree)) = parse_tree::element(&line) else {
             continue;
         };
-        create_grammar(&mut grammar, tree);
+        create_grammar(&mut absolute_grammar, tree);
     }
-    grammar
+    transform_grammar(absolute_grammar)
 }
 
 pub fn write_grammar(
