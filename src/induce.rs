@@ -1,4 +1,7 @@
-use std::{collections::HashMap, io};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 use parse_tree::ParseTree;
 
@@ -59,6 +62,35 @@ pub fn induce_grammar() -> HashMap<String, HashMap<Rhs, f64>> {
         create_grammar(&mut grammar, tree);
     }
     grammar
+}
+
+pub fn write_grammar(
+    rules: &mut Box<dyn Write>,
+    lexicon: &mut Box<dyn Write>,
+    words: &mut Box<dyn Write>,
+    grammar: &HashMap<String, HashMap<Rhs, f64>>,
+) {
+    for (non_terminal, value) in grammar {
+        for (body, probability) in value {
+            match body {
+                Rhs::Terminal(terminal) => {
+                    writeln!(lexicon, "{} {} {}", non_terminal, terminal, probability)
+                        .expect("cannot write to lexicon");
+                    writeln!(words, "{}", terminal).expect("cannot write to words");
+                }
+                Rhs::NonTerminals(non_terminals) => {
+                    writeln!(
+                        rules,
+                        "{} -> {} {}",
+                        non_terminal,
+                        non_terminals.join(" "),
+                        probability
+                    )
+                    .expect("cannot write to rules");
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -131,7 +163,10 @@ mod tests {
                 ),
                 (
                     "ROOT".to_string(),
-                    HashMap::from([(Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]), 1.0)])
+                    HashMap::from([(
+                        Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
+                        1.0
+                    )])
                 )
             ])
         );

@@ -3,3 +3,6 @@
 /test
 pcfg_tool
 /.direnv
+*.words
+*.rules
+*.lexicon

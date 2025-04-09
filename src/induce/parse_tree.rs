@@ -24,10 +24,10 @@ impl<T> ParseTree<T> {
     where
         N: FnMut(&Self),
     {
-        self.children.iter().for_each(|child| {
+        for child in &self.children {
             child.execute_for_nodes(f);
             f(self);
-        });
+        }
     }
 }
 
