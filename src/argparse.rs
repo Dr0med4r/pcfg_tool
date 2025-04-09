@@ -11,7 +11,7 @@ pub struct Args {
 #[derive(Subcommand, Clone)]
 pub enum Commands {
     Induce {
-        /// Sets the name of the Grammar files (GRAMMAR.rules, GRAMMAR.lexicon, GRAMMAR.words)
+        /// Sets the name of the Grammar files ([GRAMMAR].rules, [GRAMMAR].lexicon, [GRAMMAR].words)
         #[arg()]
         grammar: Option<String>,
     },
