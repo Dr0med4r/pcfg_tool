@@ -24,9 +24,9 @@ impl<T> ParseTree<T> {
     where
         N: FnMut(&Self),
     {
+        f(self);
         for child in &self.children {
             child.execute_for_nodes(f);
-            f(self);
         }
     }
 }
