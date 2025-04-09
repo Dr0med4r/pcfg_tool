@@ -54,7 +54,7 @@ fn transform_grammar(
     let mut grammar = HashMap::new();
     for (non_terminal, body) in absolute_grammar {
         let mut new_body = HashMap::new();
-        let total = body.len() as f64;
+        let total = body.values().sum::<u64>() as f64;
         for (item, count) in body {
             new_body.insert(item, count as f64 / total);
         }
@@ -188,6 +188,41 @@ mod tests {
                 "NS".to_string(),
                 HashMap::from([
                     (Rhs::Terminal("hi".to_string()), 1),
+                    (Rhs::Terminal("ho".to_string()), 2),
+                ]),
+            ),
+            (
+                "ROOT".to_string(),
+                HashMap::from([(
+                    Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
+                    1,
+                )]),
+            ),
+        ]); // (ROOT (NS hi) (NS ho))
+        assert_eq!(
+            transform_grammar(grammar),
+            HashMap::from([
+                (
+                    "NS".to_string(),
+                    HashMap::from([
+                        (Rhs::Terminal("hi".to_string()), 1.0 / 3.0),
+                        (Rhs::Terminal("ho".to_string()), 2.0 / 3.0),
+                    ])
+                ),
+                (
+                    "ROOT".to_string(),
+                    HashMap::from([(
+                        Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
+                        1.0
+                    )])
+                )
+            ])
+        );
+        let grammar = HashMap::from([
+            (
+                "NS".to_string(),
+                HashMap::from([
+                    (Rhs::Terminal("hi".to_string()), 1),
                     (Rhs::Terminal("ho".to_string()), 1),
                 ]),
             ),
@@ -216,7 +251,6 @@ mod tests {
                         1.0
                     )])
                 )
-            ])
-        )
+            ]));
     }
 }
