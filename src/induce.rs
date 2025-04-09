@@ -120,26 +120,25 @@ mod tests {
                 }],
             }],
         }; // (ROOT (NS hi))
-        let mut grammar: HashMap<String, HashMap<Rhs, f64>> = HashMap::new();
+        let mut grammar: HashMap<String, HashMap<Rhs, u64>> = HashMap::new();
         create_grammar(&mut grammar, tree);
-        eprintln!("{:?}", grammar);
         assert_eq!(
             grammar,
             HashMap::from([
                 (
                     "NS".to_string(),
-                    HashMap::from([(Rhs::Terminal("hi".to_string()), 1.0)])
+                    HashMap::from([(Rhs::Terminal("hi".to_string()), 1)])
                 ),
                 (
                     "ROOT".to_string(),
-                    HashMap::from([(Rhs::NonTerminals(vec!["NS".to_string()]), 1.0)])
+                    HashMap::from([(Rhs::NonTerminals(vec!["NS".to_string()]), 1)])
                 )
             ])
         );
     }
 
     #[test]
-    fn create_grammar_probability_test() {
+    fn create_grammar_test_2() {
         let tree = ParseTree {
             root: "ROOT",
             children: vec![
@@ -159,11 +158,49 @@ mod tests {
                 },
             ],
         }; // (ROOT (NS hi) (NS ho))
-        let mut grammar: HashMap<String, HashMap<Rhs, f64>> = HashMap::new();
+        let mut grammar: HashMap<String, HashMap<Rhs, u64>> = HashMap::new();
         create_grammar(&mut grammar, tree);
-        eprintln!("{:?}", grammar);
         assert_eq!(
             grammar,
+            HashMap::from([
+                (
+                    "NS".to_string(),
+                    HashMap::from([
+                        (Rhs::Terminal("hi".to_string()), 1),
+                        (Rhs::Terminal("ho".to_string()), 1),
+                    ])
+                ),
+                (
+                    "ROOT".to_string(),
+                    HashMap::from([(
+                        Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
+                        1
+                    )])
+                )
+            ])
+        );
+    }
+
+    #[test]
+    fn transform_grammar_test() {
+        let grammar = HashMap::from([
+            (
+                "NS".to_string(),
+                HashMap::from([
+                    (Rhs::Terminal("hi".to_string()), 1),
+                    (Rhs::Terminal("ho".to_string()), 1),
+                ]),
+            ),
+            (
+                "ROOT".to_string(),
+                HashMap::from([(
+                    Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
+                    1,
+                )]),
+            ),
+        ]); // (ROOT (NS hi) (NS ho))
+        assert_eq!(
+            transform_grammar(grammar),
             HashMap::from([
                 (
                     "NS".to_string(),
@@ -180,6 +217,6 @@ mod tests {
                     )])
                 )
             ])
-        );
+        )
     }
 }
