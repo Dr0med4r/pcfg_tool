@@ -20,6 +20,7 @@ impl<T> ParseTree<T> {
     pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
+    /// recursive executes the function f for itself and all children
     pub fn execute_for_nodes<N>(&self, f: &mut N)
     where
         N: FnMut(&Self),
@@ -68,6 +69,7 @@ fn elements(input: &str) -> IResult<&str, Vec<ParseTree<&str>>> {
     many1(delimited(space0, element, space0)).parse(input)
 }
 
+/// returns the remainder of the input and the parsed tree for the input
 pub fn element(input: &str) -> IResult<&str, ParseTree<&str>> {
     let (input, (name, elements)) = delimited(
         char('('),

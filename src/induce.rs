@@ -13,6 +13,7 @@ pub enum Rhs {
     NonTerminals(Vec<String>),
 }
 
+/// writes the grammar rules from the `tree` into `grammar` and counts the ocurrences of each rule
 fn create_grammar(grammar: &mut HashMap<String, HashMap<Rhs, u64>>, tree: ParseTree<&str>) {
     tree.execute_for_nodes(&mut |node| {
         if node.is_leaf() {
@@ -48,6 +49,7 @@ fn create_grammar(grammar: &mut HashMap<String, HashMap<Rhs, u64>>, tree: ParseT
     });
 }
 
+/// transforms the grammar from absolute count to a probability distribution over each non-terminal
 fn transform_grammar(
     absolute_grammar: HashMap<String, HashMap<Rhs, u64>>,
 ) -> HashMap<String, HashMap<Rhs, f64>> {
@@ -63,6 +65,7 @@ fn transform_grammar(
     grammar
 }
 
+/// gets trees in s-expression form from stdin and returns a pcfg
 pub fn induce_grammar() -> HashMap<String, HashMap<Rhs, f64>> {
     let mut absolute_grammar: HashMap<String, HashMap<Rhs, u64>> = HashMap::new();
     for line in io::stdin().lines() {
@@ -75,6 +78,8 @@ pub fn induce_grammar() -> HashMap<String, HashMap<Rhs, f64>> {
     transform_grammar(absolute_grammar)
 }
 
+/// writes the rules of the grammar to `rules` the terminals to `words` and the rules of terminals to
+/// `lexicon`
 pub fn write_grammar(
     rules: &mut Box<dyn Write>,
     lexicon: &mut Box<dyn Write>,
@@ -251,6 +256,7 @@ mod tests {
                         1.0
                     )])
                 )
-            ]));
+            ])
+        );
     }
 }
