@@ -41,11 +41,14 @@ fn update_grammar(grammar: &mut HashMap<String, HashMap<Rhs, u64>>, tree: ParseT
                 .collect();
             Rhs::NonTerminals(child_names)
         };
-        let probability: u64 = match body.get(&lhs) {
-            Some(&probability) => probability + 1,
-            None => 1,
-        };
-        body.insert(lhs, probability);
+        match body.get_mut(&lhs) {
+            Some(probability) => {
+                *probability += 1;
+            }
+            None => {
+                body.insert(lhs, 1);
+            }
+        }
     });
 }
 
