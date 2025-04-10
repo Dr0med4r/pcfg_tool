@@ -1,3 +1,4 @@
+.PHONY: pcfg_tool
 pcfg_tool:
 	cargo build --release
-	cp target/release/pcfg_tool .
+	cp -p target/release/pcfg_tool .
