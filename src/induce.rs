@@ -14,7 +14,7 @@ pub enum Rhs {
 }
 
 /// writes the grammar rules from the `tree` into `grammar` and counts the ocurrences of each rule
-fn create_grammar(grammar: &mut HashMap<String, HashMap<Rhs, u64>>, tree: ParseTree<&str>) {
+fn update_grammar(grammar: &mut HashMap<String, HashMap<Rhs, u64>>, tree: ParseTree<&str>) {
     tree.execute_for_nodes(&mut |node| {
         if node.is_leaf() {
             return;
@@ -114,7 +114,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn create_grammar_test() {
+    fn update_grammar_test() {
         let tree = ParseTree {
             root: "ROOT",
             children: vec![ParseTree {
@@ -126,7 +126,7 @@ mod tests {
             }],
         }; // (ROOT (NS hi))
         let mut grammar: HashMap<String, HashMap<Rhs, u64>> = HashMap::new();
-        create_grammar(&mut grammar, tree);
+        update_grammar(&mut grammar, tree);
         assert_eq!(
             grammar,
             HashMap::from([
@@ -143,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn create_grammar_test_2() {
+    fn update_grammar_test_2() {
         let tree = ParseTree {
             root: "ROOT",
             children: vec![
@@ -164,7 +164,7 @@ mod tests {
             ],
         }; // (ROOT (NS hi) (NS ho))
         let mut grammar: HashMap<String, HashMap<Rhs, u64>> = HashMap::new();
-        create_grammar(&mut grammar, tree);
+        update_grammar(&mut grammar, tree);
         assert_eq!(
             grammar,
             HashMap::from([
