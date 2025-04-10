@@ -68,12 +68,18 @@ fn transform_grammar(
 /// gets trees in s-expression form from stdin and returns a pcfg
 pub fn induce_grammar() -> HashMap<String, HashMap<Rhs, f64>> {
     let mut absolute_grammar: HashMap<String, HashMap<Rhs, u64>> = HashMap::new();
-    for line in io::stdin().lines() {
+    for (line_number, line) in io::stdin().lines().enumerate() {
         let Ok(line) = line else { continue };
-        let Ok((_, tree)) = parse_tree::element(&line) else {
+        let Ok((remaining_line, tree)) = parse_tree::element(&line) else {
             continue;
         };
-        create_grammar(&mut absolute_grammar, tree);
+        if remaining_line.trim() != "" {
+            eprintln!(
+                "Line {} was not completly parsed! Remainder: {:?}",
+                line_number, remaining_line
+            );
+        }
+        update_grammar(&mut absolute_grammar, tree);
     }
     transform_grammar(absolute_grammar)
 }
