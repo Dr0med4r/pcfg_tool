@@ -20,15 +20,7 @@ fn update_grammar(grammar: &mut HashMap<String, HashMap<Rhs, u64>>, tree: ParseT
             return;
         }
         let non_terminal = node.root.to_string();
-        let body: &mut HashMap<Rhs, u64> = match grammar.get_mut(&non_terminal) {
-            Some(rhs) => rhs,
-            None => {
-                grammar.insert(non_terminal.clone(), HashMap::new());
-                grammar
-                    .get_mut(&non_terminal)
-                    .expect("just inserted the value that is asked")
-            }
-        };
+        let body: &mut HashMap<Rhs, u64> = grammar.entry(non_terminal).or_default();
         let child = node.children.first().expect("node should not be a leaf");
         // assumes that if the child is a leaf it is also a terminal
         let lhs = if child.is_leaf() {
@@ -41,14 +33,9 @@ fn update_grammar(grammar: &mut HashMap<String, HashMap<Rhs, u64>>, tree: ParseT
                 .collect();
             Rhs::NonTerminals(child_names)
         };
-        match body.get_mut(&lhs) {
-            Some(probability) => {
-                *probability += 1;
-            }
-            None => {
-                body.insert(lhs, 1);
-            }
-        }
+        body.entry(lhs)
+            .and_modify(|probability| *probability += 1)
+            .or_insert(1);
     });
 }
 
