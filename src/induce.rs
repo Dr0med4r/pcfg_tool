@@ -1,9 +1,10 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     io::{self, Write},
 };
 
 use parse_tree::ParseTree;
+use foldhash::{HashMap, HashMapExt};
 
 pub mod parse_tree;
 
