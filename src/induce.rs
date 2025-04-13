@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{self, Write},
 };
 
@@ -82,13 +82,17 @@ pub fn write_grammar(
     words: &mut Box<dyn Write>,
     grammar: &HashMap<String, HashMap<Rhs, f64>>,
 ) {
+    let mut seen_words: HashSet<&String> = HashSet::new();
     for (non_terminal, value) in grammar {
         for (body, probability) in value {
             match body {
                 Rhs::Terminal(terminal) => {
                     writeln!(lexicon, "{} {} {}", non_terminal, terminal, probability)
                         .expect("cannot write to lexicon");
-                    writeln!(words, "{}", terminal).expect("cannot write to words");
+                    let new = seen_words.insert(terminal);
+                    if new {
+                        writeln!(words, "{}", terminal).expect("cannot write to words");
+                    }
                 }
                 Rhs::NonTerminals(non_terminals) => {
                     writeln!(
