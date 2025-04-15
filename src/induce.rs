@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
     io::{self, Write},
+    process::exit,
 };
 
 use foldhash::{HashMap, HashMapExt};
@@ -62,13 +63,19 @@ pub fn induce_grammar() -> HashMap<String, HashMap<Rhs, f64>> {
     for (line_number, line) in io::stdin().lines().enumerate() {
         let Ok(line) = line else { continue };
         let Ok((remaining_line, tree)) = parse_tree::element(&line) else {
-            continue;
+            eprintln!(
+                "Line {} could not be parsed. Probably because it is not a correct parse-tree.",
+                line_number + 1,
+            );
+            exit(1);
         };
         if remaining_line.trim() != "" {
             eprintln!(
-                "Line {} was not completly parsed! Remainder: {:?}",
-                line_number, remaining_line
+                "Line {} was not completly parsed! Probably because it is not a correct parse-tree. Remainder: {:?}",
+                line_number + 1,
+                remaining_line
             );
+            exit(1);
         }
         update_grammar(&mut absolute_grammar, tree);
     }
