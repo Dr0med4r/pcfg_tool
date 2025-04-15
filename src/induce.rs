@@ -3,8 +3,8 @@ use std::{
     io::{self, Write},
 };
 
-use parse_tree::ParseTree;
 use foldhash::{HashMap, HashMapExt};
+use parse_tree::ParseTree;
 
 pub mod parse_tree;
 
@@ -130,14 +130,14 @@ mod tests {
         update_grammar(&mut grammar, tree);
         assert_eq!(
             grammar,
-            HashMap::from([
+            HashMap::from_iter([
                 (
                     "NS".to_string(),
-                    HashMap::from([(Rhs::Terminal("hi".to_string()), 1)])
+                    HashMap::from_iter([(Rhs::Terminal("hi".to_string()), 1)])
                 ),
                 (
                     "ROOT".to_string(),
-                    HashMap::from([(Rhs::NonTerminals(vec!["NS".to_string()]), 1)])
+                    HashMap::from_iter([(Rhs::NonTerminals(vec!["NS".to_string()]), 1)])
                 )
             ])
         );
@@ -168,17 +168,17 @@ mod tests {
         update_grammar(&mut grammar, tree);
         assert_eq!(
             grammar,
-            HashMap::from([
+            HashMap::from_iter([
                 (
                     "NS".to_string(),
-                    HashMap::from([
+                    HashMap::from_iter([
                         (Rhs::Terminal("hi".to_string()), 1),
                         (Rhs::Terminal("ho".to_string()), 1),
                     ])
                 ),
                 (
                     "ROOT".to_string(),
-                    HashMap::from([(
+                    HashMap::from_iter([(
                         Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
                         1
                     )])
@@ -189,17 +189,17 @@ mod tests {
 
     #[test]
     fn transform_grammar_test() {
-        let grammar = HashMap::from([
+        let grammar = HashMap::from_iter([
             (
                 "NS".to_string(),
-                HashMap::from([
+                HashMap::from_iter([
                     (Rhs::Terminal("hi".to_string()), 1),
                     (Rhs::Terminal("ho".to_string()), 2),
                 ]),
             ),
             (
                 "ROOT".to_string(),
-                HashMap::from([(
+                HashMap::from_iter([(
                     Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
                     1,
                 )]),
@@ -207,34 +207,34 @@ mod tests {
         ]); // (ROOT (NS hi) (NS ho))
         assert_eq!(
             transform_grammar(grammar),
-            HashMap::from([
+            HashMap::from_iter([
                 (
                     "NS".to_string(),
-                    HashMap::from([
+                    HashMap::from_iter([
                         (Rhs::Terminal("hi".to_string()), 1.0 / 3.0),
                         (Rhs::Terminal("ho".to_string()), 2.0 / 3.0),
                     ])
                 ),
                 (
                     "ROOT".to_string(),
-                    HashMap::from([(
+                    HashMap::from_iter([(
                         Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
                         1.0
                     )])
                 )
             ])
         );
-        let grammar = HashMap::from([
+        let grammar = HashMap::from_iter([
             (
                 "NS".to_string(),
-                HashMap::from([
+                HashMap::from_iter([
                     (Rhs::Terminal("hi".to_string()), 1),
                     (Rhs::Terminal("ho".to_string()), 1),
                 ]),
             ),
             (
                 "ROOT".to_string(),
-                HashMap::from([(
+                HashMap::from_iter([(
                     Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
                     1,
                 )]),
@@ -242,17 +242,17 @@ mod tests {
         ]); // (ROOT (NS hi) (NS ho))
         assert_eq!(
             transform_grammar(grammar),
-            HashMap::from([
+            HashMap::from_iter([
                 (
                     "NS".to_string(),
-                    HashMap::from([
+                    HashMap::from_iter([
                         (Rhs::Terminal("hi".to_string()), 0.5),
                         (Rhs::Terminal("ho".to_string()), 0.5),
                     ])
                 ),
                 (
                     "ROOT".to_string(),
-                    HashMap::from([(
+                    HashMap::from_iter([(
                         Rhs::NonTerminals(vec!["NS".to_string(), "NS".to_string()]),
                         1.0
                     )])
