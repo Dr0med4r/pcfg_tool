@@ -20,18 +20,25 @@ pub enum Commands {
         rules: PathBuf,
         #[arg(value_name = "LEXICON")]
         lexicon: PathBuf,
+
+        /// how to parse: cyk or deductive
         #[arg(short, long)]
         paradigma: Option<String>,
         #[arg(short, long, default_value_t=String::from("ROOT"))]
         initial_nonterminal: String,
+        /// replace unknown words
         #[arg(short, long)]
         unking: bool,
+        /// replace unknown words with smoothing
         #[arg(short, long)]
         smoothing: bool,
+        /// use beam search with threshhold
         #[arg(short, long)]
         threshold_beam: u64,
+        /// use beam search with constant size
         #[arg(short, long)]
         rank_beam: u64,
+        /// use a star search
         #[arg(short, long)]
         astar: PathBuf,
     },

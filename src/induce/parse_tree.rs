@@ -54,7 +54,7 @@ impl<T: Display> Display for ParseTree<T> {
     }
 }
 
-fn atom(input: &str) -> IResult<&str, &str> {
+pub fn atom(input: &str) -> IResult<&str, &str> {
     delimited(space0, is_not(" ()"), space0).parse(input)
 }
 
