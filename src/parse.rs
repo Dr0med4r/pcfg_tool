@@ -1,8 +1,8 @@
+mod structures;
+
 use std::{
-    cmp::Ordering,
     collections::BinaryHeap,
     fs::File,
-    hash::Hash,
     io::{BufRead, BufReader},
     path::Path,
     process::exit,
@@ -10,257 +10,204 @@ use std::{
 
 use foldhash::HashMap;
 use foldhash::HashSet;
+use structures::{Item, Rule, WeightMap};
 
-use nom::{
-    Parser,
-    bytes::complete::is_a,
-    character::{char, complete::space0},
-    combinator::map,
-    multi::many_till,
-    sequence::delimited,
-};
-
-use crate::induce::parse_tree::atom;
-
-struct Consequence<'a> {
-    start: u64,
-    item: &'a Item,
-    end: u64,
-    weight: f64,
-}
-
-impl<'a> Eq for Consequence<'a> {}
-
-impl<'a> PartialEq for Consequence<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        self.start == other.start && self.item == other.item && self.end == other.end
-    }
-}
-
-impl<'a> PartialOrd for Consequence<'a> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.start.partial_cmp(&other.start) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.item.partial_cmp(&other.item) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.end.partial_cmp(&other.end)
-    }
-}
-
-impl<'a> Ord for Consequence<'a> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.weight < other.weight {
-            return Ordering::Less;
-        } else if self.weight > other.weight {
-            return Ordering::Greater;
-        } else {
-            return Ordering::Equal;
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Item {
-    NonTerminal(String),
-    Terminal(String),
-}
-
-#[derive(Debug)]
-pub struct Rule<T> {
-    lhs: T,
-    rhs: Vec<T>,
-    weight: f64,
-}
-
-impl<T: Hash> Hash for Rule<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.lhs.hash(state);
-        self.rhs.hash(state);
-    }
-}
-
-impl<T: Eq> Eq for Rule<T> {}
-impl<T: PartialEq> PartialEq for Rule<T> {
-    fn eq(&self, other: &Self) -> bool {
-        // do not check the weight as there is only one rule in the grammar file
-        self.lhs == other.lhs && self.rhs == other.rhs
-    }
-}
-
-impl Rule<Item> {
-    fn from_rule(input: &str) -> Self {
-        let to_nonterminal = |e: &str| Item::NonTerminal(e.to_string());
-        let to_float = |e: &str| {
-            e.parse::<f64>().unwrap_or_else(|e| {
-                eprintln!("{e}");
-                exit(1)
-            })
-        };
-        let (_, (lhs, _, _, (rhs, weight))) = match (
-            map(atom, to_nonterminal),
-            char('-'),
-            char('>'),
-            many_till(
-                map(atom, to_nonterminal),
-                map(delimited(space0, is_a("1234567890."), space0), to_float),
-            ),
-        )
-            .parse(input)
-        {
-            Ok(a) => a,
-            Err(e) => {
-                eprintln!("{}", e);
-                exit(1);
-            }
-        };
-        Rule { lhs, rhs, weight }
-    }
-    fn from_lexicon(input: &str) -> Self {
-        let to_nonterminal = |e: &str| Item::NonTerminal(e.to_string());
-        let to_terminal = |e: &str| Item::Terminal(e.to_string());
-        let to_float = |e: &str| {
-            e.parse::<f64>().unwrap_or_else(|e| {
-                eprintln!("{e}");
-                exit(1)
-            })
-        };
-        let (_, (lhs, rhs, weight)) = match (
-            map(atom, to_nonterminal),
-            map(atom, to_terminal),
-            map(atom, to_float),
-        )
-            .parse(input)
-        {
-            Ok(a) => a,
-            Err(e) => {
-                eprintln!("{}", e);
-                exit(1);
-            }
-        };
-        Rule {
-            lhs,
-            rhs: vec![rhs],
-            weight,
-        }
-    }
-}
-
-struct WeightMap {
-    data: Vec<f64>,
-    rules: usize,
-    len: usize,
-}
-
-impl WeightMap {
-    fn get(self, consequence: Consequence) {
-        let index = consequence.item * (consequence.end * consequence.start)/2 ;
-        return self.data.get(index)
-    }
-
-    fn with_capacity(rules: usize, len: usize) -> Self {
-        let length = rules * (len * (len + 1) / 2);
-        let mut data = Vec::with_capacity(length);
-        data.resize(length, 0.0);
-        WeightMap { data, rules, len }
-    }
-
-    fn set(&self, consequence: Consequence) -> _ {
-        todo!()
-    }
-}
-
-/// appends rules into all_rules and all nonterminals as key into lookup_rules
-pub fn parse_rules<'a>(
-    all_rules: &'a mut Vec<Rule<Item>>,
+/// appends rules into all_rules and all nonterminals as keys into lookup_rules
+pub fn parse_rules(
+    string_map: &mut HashMap<String, u64>,
+    rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
     path: &Path,
-    rule: bool,
-) -> HashMap<Item, HashSet<&'a Rule<Item>>> {
+    is_rule: bool,
+) {
     let Ok(rules) = File::open(path) else {
         eprintln!("cannot open rules file");
         exit(1);
     };
-    let mut rhs_grammar: HashMap<Item, HashSet<&Rule<Item>>> = HashMap::default();
+    let mut rule_count: u64 = 0;
     for line in BufReader::new(rules).lines() {
         let Ok(line) = line else {
             eprintln!("cannot read rule");
             exit(1);
         };
-        if rule {
-            all_rules.push(Rule::from_rule(&line));
+        insert_rule_into_map(string_map, is_rule, rhs_grammar, &mut rule_count, line);
+    }
+}
+
+fn insert_rule_into_map(
+    string_map: &mut HashMap<String, u64>,
+    is_rule: bool,
+    rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
+    nonterminal_count: &mut u64,
+    line: String,
+) {
+    let rule = if is_rule {
+        Rule::from_rule(&line)
+    } else {
+        Rule::from_lexicon(&line)
+    };
+    let mut rhs = Vec::new();
+    for nonterminal in rule.rhs {
+        if string_map.contains_key(&nonterminal) {
+            continue;
+        }
+        string_map.insert(nonterminal, *nonterminal_count);
+        rhs.push(if is_rule {
+            Item::NonTerminal(*nonterminal_count)
         } else {
-            all_rules.push(Rule::from_lexicon(&line));
-        }
+            Item::Terminal(*nonterminal_count)
+        });
+        *nonterminal_count += 1;
     }
-    for rule in all_rules {
-        for nonterminal in &rule.rhs {
-            let Some(l) = rhs_grammar.get_mut(nonterminal) else {
-                continue;
-            };
-            l.insert(rule);
-        }
+    let lhs = Item::NonTerminal(*string_map.entry(rule.lhs).or_insert_with_key(|key| {
+        let lhs = *nonterminal_count;
+        *nonterminal_count += 1;
+        lhs
+    }));
+    for nonterminal in &rhs.clone() {
+        let set = rhs_grammar.entry(*nonterminal).or_default();
+        set.insert(Rule {
+            lhs,
+            rhs: rhs.clone(),
+            weight: rule.weight,
+        });
     }
-    rhs_grammar
+}
+
+pub fn transform_sentence(line: String, lexicon: &HashMap<String, u64>) -> Vec<Item> {
+    line.split_whitespace()
+        .map(|word| Item::Terminal(*lexicon.get(word).expect("this word is not in the lexicon")))
+        .collect()
 }
 
 pub fn deduce(
-    line: String,
-    rule_lookup: HashMap<Item, HashSet<&Rule<Item>>>,
-    lexicon: HashMap<Item, HashSet<&Rule<Item>>>,
+    line: Vec<Item>,
+    rule_lookup: &HashMap<Item, HashSet<Rule<Item>>>,
 ) -> Vec<(Item, f64)> {
     let mut queue = BinaryHeap::new();
-    for (index, word) in line.split_whitespace().enumerate() {
-        for rule in lexicon.get(&Item::Terminal(word.to_owned())).unwrap() {
-            queue.push(Consequence {
+    let sentence_length = line.len();
+    for (index, word) in line.into_iter().enumerate() {
+        for rule in rule_lookup.get(&word).unwrap() {
+            queue.push(structures::Consequence {
                 start: index as u64,
-                item: &rule.lhs,
+                item: rule.lhs,
                 end: (index + 1) as u64,
                 weight: rule.weight,
             });
         }
     }
-    let mut consequences = Vec::new();
-    let weight_map = WeightMap::with_capacity(rule_lookup.len(), queue.len());
+    let mut weight_map = WeightMap::with_capacity(rule_lookup.len(), sentence_length);
     while let Some(consequence) = queue.pop() {
-        if weight_map.get(consequence) == 0 {
-            weight_map.set(consequence);
+        if weight_map.get(&consequence) != 0.0 {
+            continue;
+        }
+        weight_map.set(&consequence);
+        for rule in rule_lookup.get(&consequence.item).expect("each rule should be in the lookup") {
+            if consequence.item == rule.rhs[0] {
+                for item in &rule.rhs[1..] {
+                    
+                }
+            }
         }
     }
 
-    return consequences;
+    todo!();
 }
 
 #[cfg(test)]
 mod test {
+    use foldhash::HashMapExt;
+    use structures::*;
+
     use super::*;
     #[test]
     fn from_string_test() {
         let rule = "A -> B 0.5";
-        let rule = Rule::from_rule(rule);
+        let rule = structures::Rule::from_rule(rule);
         assert_eq!(
             Rule {
-                lhs: Item::NonTerminal("A".to_string()),
-                rhs: vec![Item::NonTerminal("B".to_string())],
+                lhs: "A".to_string(),
+                rhs: vec!["B".to_string()],
                 weight: 0.5
             },
             rule
         );
         let rule = " ROOT -> B C D 0.57   ";
-        let rule = Rule::from_rule(rule);
+        let rule = structures::Rule::from_rule(rule);
         assert_eq!(
             Rule {
-                lhs: Item::NonTerminal("ROOT".to_string()),
-                rhs: vec![
-                    Item::NonTerminal("B".to_string()),
-                    Item::NonTerminal("C".to_string()),
-                    Item::NonTerminal("D".to_string())
-                ],
+                lhs: "ROOT".to_string(),
+                rhs: vec!["B".to_string(), "C".to_string(), "D".to_string()],
                 weight: 0.57
             },
             rule
         );
+    }
+
+    #[test]
+    fn into_map_from_rules_test() {
+        let mut string_map = HashMap::new();
+        let is_rule = true;
+        let mut rhs_grammar = HashMap::new();
+        let mut nonterminal_count = 0;
+        let line = "A -> B C 0.57".to_string();
+        insert_rule_into_map(
+            &mut string_map,
+            is_rule,
+            &mut rhs_grammar,
+            &mut nonterminal_count,
+            line,
+        );
+        let desired_strings = HashMap::from_iter(vec![
+            ("B".to_string(), 0),
+            ("C".to_string(), 1),
+            ("A".to_string(), 2),
+        ]);
+        assert_eq!(desired_strings, string_map);
+        let desired_grammar = HashMap::from_iter(vec![
+            (
+                Item::NonTerminal(0),
+                HashSet::from_iter(vec![Rule {
+                    lhs: Item::NonTerminal(2),
+                    rhs: vec![Item::NonTerminal(0), Item::NonTerminal(1)],
+                    weight: 0.57,
+                }]),
+            ),
+            (
+                Item::NonTerminal(1),
+                HashSet::from_iter(vec![Rule {
+                    lhs: Item::NonTerminal(2),
+                    rhs: vec![Item::NonTerminal(0), Item::NonTerminal(1)],
+                    weight: 0.57,
+                }]),
+            ),
+        ]);
+        assert_eq!(desired_grammar, rhs_grammar);
+    }
+
+    #[test]
+    fn into_map_from_lexicon_test() {
+        let mut string_map = HashMap::new();
+        let is_rule = false;
+        let mut rhs_grammar = HashMap::new();
+        let mut nonterminal_count = 0;
+        let line = "A C 0.57".to_string();
+        insert_rule_into_map(
+            &mut string_map,
+            is_rule,
+            &mut rhs_grammar,
+            &mut nonterminal_count,
+            line,
+        );
+        let desired_strings = HashMap::from_iter(vec![("C".to_string(), 0), ("A".to_string(), 1)]);
+        assert_eq!(desired_strings, string_map);
+        let desired_grammar = HashMap::from_iter(vec![(
+            Item::Terminal(0),
+            HashSet::from_iter(vec![Rule {
+                lhs: Item::NonTerminal(1),
+                rhs: vec![Item::Terminal(0)],
+                weight: 0.57,
+            }]),
+        )]);
+        assert_eq!(desired_grammar, rhs_grammar);
     }
 }

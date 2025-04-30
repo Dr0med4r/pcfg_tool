@@ -10,8 +10,9 @@ use std::{
 
 use argparse::{Args, Commands};
 use clap::Parser;
+use foldhash::{HashMap, HashMapExt};
 use induce::{induce_grammar, write_grammar};
-use parse::{deduce, parse_rules};
+use parse::{deduce, parse_rules, transform_sentence};
 
 fn main() {
     let args = Args::parse();
@@ -30,15 +31,18 @@ fn main() {
             rank_beam,
             astar,
         } => {
-            let mut all_rules = Vec::new();
-            let rule_lookup = parse_rules(&mut all_rules, rules, true);
-            let lexicon_lookup = parse_rules(&mut all_rules, lexicon, false);
+            let mut string_lookup = HashMap::new();
+            let mut rule_lookup = HashMap::new();
+            parse_rules(&mut string_lookup, &mut rule_lookup,rules, true);
+            parse_rules(&mut string_lookup, &mut rule_lookup,lexicon, false);
             for (line_number, line) in io::stdin().lines().enumerate() {
                 let Ok(line) = line else {
-                    eprintln!("error in line: {}", line_number + 1);
+                    eprintln!("error reading line {}", line_number + 1);
                     exit(1);
                 };
-                let rule_weights = deduce(line, rule_lookup, lexicon_lookup);
+                let line = transform_sentence(line, &string_lookup);
+                let rule_weights = deduce(line, &rule_lookup);
+
 
             }
         }
