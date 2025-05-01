@@ -121,6 +121,7 @@ pub fn deduce(
             .get(&consequence.item)
             .expect("there should be a rule with each nonterminal")
         {
+            // TODO either alway max two rules or do it correctly
             add_left(&mut queue, &weight_map, rule, consequence);
             add_right(&mut queue, &weight_map, rule, consequence);
             add_replace(&mut queue, rule, consequence);

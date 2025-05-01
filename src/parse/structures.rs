@@ -190,6 +190,7 @@ impl WeightMap {
                 weight: 0.0,
             });
             if self.data[index] != 0.0 {
+                // TODO what to do if there are multiple options
                 return Some(Consequence {
                     start,
                     item,
@@ -210,6 +211,7 @@ impl WeightMap {
                 weight: 0.0,
             });
             if self.data[index] != 0.0 {
+                // TODO what to do if there are multiple options
                 return Some(Consequence {
                     start,
                     item,
