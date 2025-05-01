@@ -140,26 +140,30 @@ impl Rule<String> {
     }
 }
 
-pub(crate) struct WeightMap {
-    pub(crate) data: Vec<f64>,
-    pub(crate) sentence_length: u64,
+pub struct WeightMap {
+    data: Vec<f64>,
+    sentence_length: u64,
 }
 
 impl WeightMap {
-    pub(crate) fn index(&self, consequence: &Consequence) -> usize {
-        let prev = (self.sentence_length - consequence.start)
-            * (self.sentence_length - consequence.start + 1)
+    fn index(&self, consequence: &Consequence) -> usize {
+        // n: max_len index(a,b) = size(n-a-1) + n-b
+        let prev = (self.sentence_length - consequence.start - 1)
+            * (self.sentence_length - consequence.start)
             / 2;
-        ((u64::from(consequence.item) * self.sentence_length)
+        ((u64::from(consequence.item) * (self.sentence_length * (self.sentence_length + 1) / 2))
             + prev
-            + (self.sentence_length - consequence.end - 1)) as usize
+            + (self.sentence_length - consequence.end)) as usize
     }
 
-    pub(crate) fn get(&self, consequence: &Consequence) -> f64 {
+    pub fn get(&self, consequence: &Consequence) -> f64 {
+        assert!(consequence.start < consequence.end);
+        assert!(consequence.end <= self.sentence_length);
+        assert!(consequence.start < self.sentence_length);
         self.data[self.index(consequence)]
     }
 
-    pub(crate) fn with_capacity(rules: usize, sentence_length: usize) -> Self {
+    pub fn with_capacity(rules: usize, sentence_length: usize) -> Self {
         let length = rules * (sentence_length * (sentence_length + 1) / 2);
         let mut data = Vec::with_capacity(length);
         data.resize(length, 0.0);
@@ -169,8 +173,44 @@ impl WeightMap {
         }
     }
 
-    pub(crate) fn set(&mut self, consequence: &Consequence) {
+    pub fn set(&mut self, consequence: &Consequence) {
         let index = self.index(consequence);
         self.data[index] = consequence.weight
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn weightmap_test() {
+        let mut weight_map = WeightMap::with_capacity(4, 4);
+        for rule in 0..4 {
+            for x in 0..4 {
+                for y in x + 1..5 {
+                    eprintln!("{rule}({x}{y})");
+                    weight_map.set(&Consequence {
+                        start: x,
+                        item: Item::NonTerminal(rule),
+                        end: y,
+                        weight: rule as f64 + x as f64 + y as f64 / (3.0 * 3.0 * 4.0),
+                    });
+                }
+            }
+        }
+        for rule in 0..4 {
+            for x in 0..4 {
+                for y in x + 1..5 {
+                    let value = weight_map.get(&Consequence {
+                        start: x,
+                        item: Item::NonTerminal(rule),
+                        end: y,
+                        weight: 0.5,
+                    });
+                    assert_eq!(value, rule as f64 + x as f64 + y as f64 / (3.0 * 3.0 * 4.0));
+                }
+            }
+        }
     }
 }
