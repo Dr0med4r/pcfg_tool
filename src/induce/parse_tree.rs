@@ -10,7 +10,7 @@ use nom::{
     sequence::delimited,
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct ParseTree<T> {
     pub root: T,
     pub children: Vec<ParseTree<T>>,

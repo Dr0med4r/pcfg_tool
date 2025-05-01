@@ -102,11 +102,11 @@ pub fn deduce(
     }
     let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     while let Some(consequence) = queue.pop() {
-        if weight_map.get(&consequence) != 0.0 {
+        if weight_map.get_consequence(&consequence) != 0.0 {
             continue;
         }
         weight_map.set(&consequence);
-        if weight_map.get(&Consequence {
+        if weight_map.get_consequence(&Consequence {
             start: 0,
             item: start_item,
             end: sentence_length as u64,

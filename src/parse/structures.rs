@@ -1,9 +1,10 @@
+use foldhash::HashMap;
 use nom::{
     Parser, bytes::complete::is_a, character::complete::char, character::complete::space0,
     combinator::map, multi::many_till, sequence::delimited,
 };
 
-use crate::induce::parse_tree::atom;
+use crate::induce::parse_tree::{self, ParseTree, atom};
 
 use std::process::exit;
 
@@ -154,16 +155,31 @@ impl WeightMap {
 
     fn index(&self, consequence: &Consequence) -> usize {
         // n: max_len index(a,b) = size(n-a-1) + n-b
-        ((u64::from(consequence.item) * WeightMap::elements(self.sentence_length))
-            + WeightMap::elements(self.sentence_length - consequence.start - 1)
-            + (self.sentence_length - consequence.end)) as usize
+        self.triangle_index(
+            u64::from(consequence.item),
+            consequence.start,
+            consequence.end,
+        )
     }
 
-    pub fn get(&self, consequence: &Consequence) -> f64 {
+    fn triangle_index(&self, terminal: u64, i: u64, j: u64) -> usize {
+        ((terminal * WeightMap::elements(self.sentence_length))
+            + WeightMap::elements(self.sentence_length - i - 1)
+            + (self.sentence_length - j)) as usize
+    }
+
+    pub fn get_consequence(&self, consequence: &Consequence) -> f64 {
         assert!(consequence.start < consequence.end);
         assert!(consequence.end <= self.sentence_length);
         assert!(consequence.start < self.sentence_length);
         self.data[self.index(consequence)]
+    }
+
+    pub fn get_with_index(&self, item: Item, start: u64, end: u64) -> f64 {
+        assert!(start < end);
+        assert!(end <= self.sentence_length);
+        assert!(start < self.sentence_length);
+        self.data[self.triangle_index(u64::from(item), start, end)]
     }
 
     pub fn with_capacity(items: usize, sentence_length: usize) -> Self {
@@ -222,6 +238,15 @@ impl WeightMap {
         }
         None
     }
+    pub fn convert_to_parse_tree(
+        self,
+        initial: Item,
+        string_lookup: HashMap<String, u64>,
+    ) -> ParseTree<String> {
+        // let mut tree = ParseTree::default();
+        // tree.root = string_lookup[1];
+        todo!();
+    }
 }
 
 #[cfg(test)]
@@ -249,7 +274,7 @@ mod test {
         for rule in 0..RULES {
             for x in 0..SENTENCE {
                 for y in x + 1..=SENTENCE {
-                    let value = weight_map.get(&Consequence {
+                    let value = weight_map.get_consequence(&Consequence {
                         start: x,
                         item: Item::NonTerminal(rule),
                         end: y,
