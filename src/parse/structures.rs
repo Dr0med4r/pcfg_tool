@@ -11,11 +11,12 @@ use std::hash::Hash;
 
 use std::cmp::Ordering;
 
-pub(crate) struct Consequence {
-    pub(crate) start: u64,
-    pub(crate) item: Item,
-    pub(crate) end: u64,
-    pub(crate) weight: f64,
+#[derive(Clone, Copy, Debug)]
+pub struct Consequence {
+    pub start: u64,
+    pub item: Item,
+    pub end: u64,
+    pub weight: f64,
 }
 
 impl Eq for Consequence {}
@@ -115,7 +116,7 @@ impl Rule<String> {
         let to_string = |e: &str| e.to_string();
         let to_float = |e: &str| {
             e.parse::<f64>().unwrap_or_else(|e| {
-                eprintln!("{e}");
+                eprintln!("lexicon parsing: {e}");
                 exit(1)
             })
         };
@@ -140,19 +141,21 @@ impl Rule<String> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct WeightMap {
     data: Vec<f64>,
     sentence_length: u64,
 }
 
 impl WeightMap {
+    fn elements(len: u64) -> u64 {
+        (len * (len + 1)) / 2
+    }
+
     fn index(&self, consequence: &Consequence) -> usize {
         // n: max_len index(a,b) = size(n-a-1) + n-b
-        let prev = (self.sentence_length - consequence.start - 1)
-            * (self.sentence_length - consequence.start)
-            / 2;
-        ((u64::from(consequence.item) * (self.sentence_length * (self.sentence_length + 1) / 2))
-            + prev
+        ((u64::from(consequence.item) * WeightMap::elements(self.sentence_length))
+            + WeightMap::elements(self.sentence_length - consequence.start - 1)
             + (self.sentence_length - consequence.end)) as usize
     }
 
@@ -163,8 +166,8 @@ impl WeightMap {
         self.data[self.index(consequence)]
     }
 
-    pub fn with_capacity(rules: usize, sentence_length: usize) -> Self {
-        let length = rules * (sentence_length * (sentence_length + 1) / 2);
+    pub fn with_capacity(items: usize, sentence_length: usize) -> Self {
+        let length = items * WeightMap::elements(sentence_length as u64) as usize;
         let mut data = Vec::with_capacity(length);
         data.resize(length, 0.0);
         WeightMap {
@@ -177,6 +180,46 @@ impl WeightMap {
         let index = self.index(consequence);
         self.data[index] = consequence.weight
     }
+
+    pub fn get_starts_at(&self, item: Item, start: u64) -> Option<Consequence> {
+        for end in start + 1..=self.sentence_length {
+            let index = self.index(&Consequence {
+                start,
+                item,
+                end,
+                weight: 0.0,
+            });
+            if self.data[index] != 0.0 {
+                return Some(Consequence {
+                    start,
+                    item,
+                    end,
+                    weight: self.data[index],
+                });
+            }
+        }
+        None
+    }
+
+    pub fn get_ends_at(&self, item: Item, end: u64) -> Option<Consequence> {
+        for start in 0..end {
+            let index = self.index(&Consequence {
+                start,
+                item,
+                end,
+                weight: 0.0,
+            });
+            if self.data[index] != 0.0 {
+                return Some(Consequence {
+                    start,
+                    item,
+                    end,
+                    weight: self.data[index],
+                });
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -185,10 +228,12 @@ mod test {
 
     #[test]
     fn weightmap_test() {
-        let mut weight_map = WeightMap::with_capacity(4, 4);
-        for rule in 0..4 {
-            for x in 0..4 {
-                for y in x + 1..5 {
+        const RULES: u64 = 4;
+        const SENTENCE: u64 = 4;
+        let mut weight_map = WeightMap::with_capacity(RULES as usize, SENTENCE as usize);
+        for rule in 0..RULES {
+            for x in 0..SENTENCE {
+                for y in x + 1..=SENTENCE {
                     eprintln!("{rule}({x}{y})");
                     weight_map.set(&Consequence {
                         start: x,
@@ -199,9 +244,9 @@ mod test {
                 }
             }
         }
-        for rule in 0..4 {
-            for x in 0..4 {
-                for y in x + 1..5 {
+        for rule in 0..RULES {
+            for x in 0..SENTENCE {
+                for y in x + 1..=SENTENCE {
                     let value = weight_map.get(&Consequence {
                         start: x,
                         item: Item::NonTerminal(rule),

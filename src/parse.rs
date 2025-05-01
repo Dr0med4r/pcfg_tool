@@ -1,4 +1,4 @@
-mod structures;
+pub mod structures;
 
 use std::{
     collections::BinaryHeap,
@@ -10,7 +10,7 @@ use std::{
 
 use foldhash::HashMap;
 use foldhash::HashSet;
-use structures::{Item, Rule, WeightMap};
+use structures::{Consequence, Item, Rule, WeightMap};
 
 /// appends rules into all_rules and all nonterminals as keys into lookup_rules
 pub fn parse_rules(
@@ -82,11 +82,16 @@ pub fn transform_sentence(line: String, lexicon: &HashMap<String, u64>) -> Vec<I
 pub fn deduce(
     line: Vec<Item>,
     rule_lookup: &HashMap<Item, HashSet<Rule<Item>>>,
-) -> Vec<(Item, f64)> {
+    start_item: Item,
+    number_of_items: usize,
+) -> WeightMap {
     let mut queue = BinaryHeap::new();
     let sentence_length = line.len();
-    for (index, word) in line.into_iter().enumerate() {
-        for rule in rule_lookup.get(&word).unwrap() {
+    for (index, word) in line.iter().enumerate() {
+        for rule in rule_lookup
+            .get(word)
+            .expect("there is no rule that produces the word")
+        {
             queue.push(structures::Consequence {
                 start: index as u64,
                 item: rule.lhs,
@@ -95,22 +100,96 @@ pub fn deduce(
             });
         }
     }
-    let mut weight_map = WeightMap::with_capacity(rule_lookup.len(), sentence_length);
+    let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     while let Some(consequence) = queue.pop() {
         if weight_map.get(&consequence) != 0.0 {
             continue;
         }
         weight_map.set(&consequence);
-        for rule in rule_lookup.get(&consequence.item).expect("each rule should be in the lookup") {
-            if consequence.item == rule.rhs[0] {
-                for item in &rule.rhs[1..] {
-                    
-                }
+        if weight_map.get(&Consequence {
+            start: 0,
+            item: start_item,
+            end: sentence_length as u64,
+            weight: 0.0,
+        }) != 0.0
+        {
+            break;
+        }
+        eprintln!("looking for {:?}", consequence);
+        // iterate over all rules with the item on the right
+        for rule in rule_lookup
+            .get(&consequence.item)
+            .expect("there should be a rule with each nonterminal")
+        {
+            add_left(&mut queue, &weight_map, rule, consequence);
+            add_right(&mut queue, &weight_map, rule, consequence);
+            add_replace(&mut queue, rule, consequence);
+        }
+    }
+    weight_map
+}
+
+fn add_replace(queue: &mut BinaryHeap<Consequence>, rule: &Rule<Item>, consequence: Consequence) {
+    // if there is a rule with the item on the right side replace it with the left side
+    if rule.rhs.len() == 1 {
+        eprintln!("replace: {:?} with {:?}", consequence.item, rule.lhs);
+        queue.push(Consequence {
+            start: consequence.start,
+            item: rule.lhs,
+            end: consequence.end,
+            weight: consequence.weight * rule.weight,
+        })
+    }
+}
+
+fn add_right(
+    queue: &mut BinaryHeap<Consequence>,
+    weight_map: &WeightMap,
+    rule: &Rule<Item>,
+    consequence: Consequence,
+) {
+    // if there is a rule with the item last
+    // add all consequences to the queue where the sequence of items is in the weight map
+    // such that item1.end == item2.start, item2.end == item3.start ...
+    // then Consequence {start: item1.start, item: lhs, end: itemn.end } is added
+    if consequence.item == rule.rhs[rule.rhs.len() - 1] {
+        for item in rule.rhs[..rule.rhs.len() - 1].iter().rev() {
+            if let Some(next) = weight_map.get_ends_at(*item, consequence.start) {
+                eprintln!("add {:?} left of {:?}", &next, &consequence);
+                queue.push(Consequence {
+                    start: next.start,
+                    item: rule.lhs,
+                    end: consequence.end,
+                    weight: consequence.weight * next.weight * rule.weight,
+                });
             }
         }
     }
+}
 
-    todo!();
+fn add_left(
+    queue: &mut BinaryHeap<Consequence>,
+    weight_map: &WeightMap,
+    rule: &Rule<Item>,
+    consequence: Consequence,
+) {
+    // if there is a rule with the item first
+    // add all consequences to the queue where the sequence of items is in the weight map
+    // such that item1.end == item2.start, item2.end == item3.start ...
+    // then Consequence {start: item1.start, item: lhs, end: itemn.end } is added
+    if consequence.item == rule.rhs[0] {
+        for item in &rule.rhs[1..] {
+            if let Some(next) = weight_map.get_starts_at(*item, consequence.end) {
+                eprintln!("add {:?} right of {:?}", &next, &consequence);
+                queue.push(Consequence {
+                    start: consequence.start,
+                    item: rule.lhs,
+                    end: next.end,
+                    weight: consequence.weight * next.weight * rule.weight,
+                });
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -266,5 +345,84 @@ mod test {
             ),
         ]);
         assert_eq!(desired_grammar, rhs_grammar);
+    }
+
+    #[test]
+    fn deduce_test() {
+        let mut string_map = HashMap::new();
+        let mut grammar = HashMap::new();
+        let mut nonterminal_count = 0;
+        let lexicon = vec![
+            "W1 R 0.2".to_string(),
+            "W2 S 1".to_string(),
+            "W1 T 0.2".to_string(),
+        ];
+        for line in lexicon {
+            insert_rule_into_map(
+                &mut string_map,
+                false,
+                &mut grammar,
+                &mut nonterminal_count,
+                line,
+            );
+        }
+        let rules = vec![
+            "ROOT -> W1 W2 0.25".to_string(),
+            "ROOT -> W2 W2 0.75".to_string(),
+            "W1 -> W2 0.6".to_string(),
+        ];
+        for line in rules {
+            insert_rule_into_map(
+                &mut string_map,
+                true,
+                &mut grammar,
+                &mut nonterminal_count,
+                line,
+            );
+        }
+        eprintln!("grammar: \n{:#?}", grammar);
+        let initial = Item::NonTerminal(*string_map.get("ROOT").unwrap());
+        grammar.entry(initial).or_default();
+
+        let line = transform_sentence("R S T".to_string(), &string_map);
+        let mut desired_weight_map = WeightMap::with_capacity(string_map.len(), line.len());
+        // R: 0
+        // W1: 1
+        // S: 2
+        // W2: 3
+        // T: 4
+        // ROOT: 5
+        desired_weight_map.set(&Consequence {
+            start: 0,
+            item: Item::NonTerminal(1),
+            end: 1,
+            weight: 0.2,
+        });
+        desired_weight_map.set(&Consequence {
+            start: 1,
+            item: Item::NonTerminal(3),
+            end: 2,
+            weight: 1.0,
+        });
+        desired_weight_map.set(&Consequence {
+            start: 2,
+            item: Item::NonTerminal(1),
+            end: 3,
+            weight: 0.2,
+        });
+        desired_weight_map.set(&Consequence {
+            start: 1,
+            item: Item::NonTerminal(1),
+            end: 2,
+            weight: 0.6,
+        });
+        desired_weight_map.set(&Consequence {
+            start: 0,
+            item: Item::NonTerminal(5),
+            end: 2,
+            weight: 0.05,
+        });
+        let weight_map = deduce(line, &grammar, initial, string_map.len());
+        assert_eq!(weight_map, desired_weight_map);
     }
 }

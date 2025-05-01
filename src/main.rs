@@ -12,7 +12,7 @@ use argparse::{Args, Commands};
 use clap::Parser;
 use foldhash::{HashMap, HashMapExt};
 use induce::{induce_grammar, write_grammar};
-use parse::{deduce, parse_rules, transform_sentence};
+use parse::{deduce, parse_rules, structures::Item, transform_sentence};
 
 fn main() {
     let args = Args::parse();
@@ -31,19 +31,28 @@ fn main() {
             rank_beam,
             astar,
         } => {
+            match paradigma {
+                Some(paradigma) if paradigma == &"cyk".to_string() => exit(22),
+                _ => {}
+            }
             let mut string_lookup = HashMap::new();
             let mut rule_lookup = HashMap::new();
-            parse_rules(&mut string_lookup, &mut rule_lookup,rules, true);
-            parse_rules(&mut string_lookup, &mut rule_lookup,lexicon, false);
+            parse_rules(&mut string_lookup, &mut rule_lookup, rules, true);
+            parse_rules(&mut string_lookup, &mut rule_lookup, lexicon, false);
             for (line_number, line) in io::stdin().lines().enumerate() {
                 let Ok(line) = line else {
                     eprintln!("error reading line {}", line_number + 1);
                     exit(1);
                 };
                 let line = transform_sentence(line, &string_lookup);
-                let rule_weights = deduce(line, &rule_lookup);
-
-
+                let initial_nonterminal = Item::NonTerminal(
+                    *string_lookup
+                        .get(initial_nonterminal)
+                        .expect("initial nonterminal is not in the rules"),
+                );
+                rule_lookup.entry(initial_nonterminal).or_default();
+                let rule_weights =
+                    deduce(line, &rule_lookup, initial_nonterminal, string_lookup.len());
             }
         }
 
