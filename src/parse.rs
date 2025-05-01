@@ -47,18 +47,18 @@ fn insert_rule_into_map(
     };
     let mut rhs = Vec::new();
     for nonterminal in rule.rhs {
-        if string_map.contains_key(&nonterminal) {
-            continue;
-        }
-        string_map.insert(nonterminal, *nonterminal_count);
-        rhs.push(if is_rule {
-            Item::NonTerminal(*nonterminal_count)
-        } else {
-            Item::Terminal(*nonterminal_count)
+        let item = *string_map.entry(nonterminal).or_insert_with(|| {
+            let count = *nonterminal_count;
+            *nonterminal_count += 1;
+            count
         });
-        *nonterminal_count += 1;
+        rhs.push(if is_rule {
+            Item::NonTerminal(item)
+        } else {
+            Item::Terminal(item)
+        });
     }
-    let lhs = Item::NonTerminal(*string_map.entry(rule.lhs).or_insert_with_key(|key| {
+    let lhs = Item::NonTerminal(*string_map.entry(rule.lhs).or_insert_with(|| {
         let lhs = *nonterminal_count;
         *nonterminal_count += 1;
         lhs
@@ -208,6 +208,63 @@ mod test {
                 weight: 0.57,
             }]),
         )]);
+        assert_eq!(desired_grammar, rhs_grammar);
+    }
+
+    #[test]
+    fn into_map_from_both_test() {
+        let mut string_map = HashMap::new();
+        let mut rhs_grammar = HashMap::new();
+        let mut nonterminal_count = 0;
+        let lexicon_line = "B D 0.57".to_string();
+        insert_rule_into_map(
+            &mut string_map,
+            false,
+            &mut rhs_grammar,
+            &mut nonterminal_count,
+            lexicon_line,
+        );
+        let rule_line = "A -> B C 0.57".to_string();
+        insert_rule_into_map(
+            &mut string_map,
+            true,
+            &mut rhs_grammar,
+            &mut nonterminal_count,
+            rule_line,
+        );
+        let desired_strings = HashMap::from_iter(vec![
+            ("D".to_string(), 0),
+            ("B".to_string(), 1),
+            ("C".to_string(), 2),
+            ("A".to_string(), 3),
+        ]);
+        assert_eq!(desired_strings, string_map);
+        let desired_grammar = HashMap::from_iter(vec![
+            (
+                Item::NonTerminal(1),
+                HashSet::from_iter(vec![Rule {
+                    lhs: Item::NonTerminal(3),
+                    rhs: vec![Item::NonTerminal(1), Item::NonTerminal(2)],
+                    weight: 0.57,
+                }]),
+            ),
+            (
+                Item::NonTerminal(2),
+                HashSet::from_iter(vec![Rule {
+                    lhs: Item::NonTerminal(3),
+                    rhs: vec![Item::NonTerminal(1), Item::NonTerminal(2)],
+                    weight: 0.57,
+                }]),
+            ),
+            (
+                Item::Terminal(0),
+                HashSet::from_iter(vec![Rule {
+                    lhs: Item::NonTerminal(1),
+                    rhs: vec![Item::Terminal(0)],
+                    weight: 0.57,
+                }]),
+            ),
+        ]);
         assert_eq!(desired_grammar, rhs_grammar);
     }
 }
