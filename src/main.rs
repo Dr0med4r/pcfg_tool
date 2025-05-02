@@ -53,7 +53,7 @@ fn main() {
                 rule_lookup.entry(initial_nonterminal).or_default();
                 let rule_weights =
                     deduce(line, &rule_lookup, initial_nonterminal, string_lookup.len());
-                if rule_weights.get_consequence(consequence)
+                // if rule_weights.get_consequence(consequence) {}
             }
         }
 

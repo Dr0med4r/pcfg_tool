@@ -4,7 +4,7 @@ use nom::{
     combinator::map, multi::many_till, sequence::delimited,
 };
 
-use crate::induce::parse_tree::{self, ParseTree, atom};
+use crate::induce::parse_tree::{ParseTree, atom};
 
 use std::process::exit;
 
@@ -142,6 +142,77 @@ impl Rule<String> {
     }
 }
 
+fn triangle_index(triangle_length: u64, triangle: u64, i: u64, j: u64) -> usize {
+    ((triangle * WeightMap::elements(triangle_length))
+        + WeightMap::elements(triangle_length - i - 1)
+        + (triangle_length - j)) as usize
+}
+
+pub struct WeightMapIterator<'a> {
+    data: &'a Vec<f64>,
+    sentence_length: u64,
+    /// the item over which to iterate
+    item: Item,
+    /// the fixed position of the value
+    fixed: u64,
+    /// the start position of the value
+    pos: u64,
+    /// if the fixed position is the end or the start
+    start: bool,
+}
+
+impl Iterator for WeightMapIterator<'_> {
+    type Item = Consequence;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            eprintln!("pos: {}", self.pos);
+            if self.start {
+                if self.pos > self.sentence_length {
+                    return None;
+                }
+            } else if self.pos >= self.fixed {
+                return None;
+            }
+
+            let index = if self.start {
+                triangle_index(
+                    self.sentence_length,
+                    u64::from(self.item),
+                    self.fixed,
+                    self.pos,
+                )
+            } else {
+                triangle_index(
+                    self.sentence_length,
+                    u64::from(self.item),
+                    self.pos,
+                    self.fixed,
+                )
+            };
+            let pos = self.pos;
+            self.pos += 1;
+            if self.data[index] != 0.0 {
+                if self.start {
+                    return Some(Consequence {
+                        start: self.fixed,
+                        item: self.item,
+                        end: pos,
+                        weight: self.data[index],
+                    });
+                } else {
+                    return Some(Consequence {
+                        start: pos,
+                        item: self.item,
+                        end: self.fixed,
+                        weight: self.data[index],
+                    });
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct WeightMap {
     data: Vec<f64>,
@@ -153,22 +224,17 @@ impl WeightMap {
         (len * (len + 1)) / 2
     }
 
-    fn index(&self, consequence: &Consequence) -> usize {
+    fn index(&self, consequence: Consequence) -> usize {
         // n: max_len index(a,b) = size(n-a-1) + n-b
-        self.triangle_index(
+        triangle_index(
+            self.sentence_length,
             u64::from(consequence.item),
             consequence.start,
             consequence.end,
         )
     }
 
-    fn triangle_index(&self, terminal: u64, i: u64, j: u64) -> usize {
-        ((terminal * WeightMap::elements(self.sentence_length))
-            + WeightMap::elements(self.sentence_length - i - 1)
-            + (self.sentence_length - j)) as usize
-    }
-
-    pub fn get_consequence(&self, consequence: &Consequence) -> f64 {
+    pub fn get_consequence(&self, consequence: Consequence) -> f64 {
         assert!(consequence.start < consequence.end);
         assert!(consequence.end <= self.sentence_length);
         assert!(consequence.start < self.sentence_length);
@@ -179,7 +245,7 @@ impl WeightMap {
         assert!(start < end);
         assert!(end <= self.sentence_length);
         assert!(start < self.sentence_length);
-        self.data[self.triangle_index(u64::from(item), start, end)]
+        self.data[triangle_index(self.sentence_length, u64::from(item), start, end)]
     }
 
     pub fn with_capacity(items: usize, sentence_length: usize) -> Self {
@@ -192,59 +258,40 @@ impl WeightMap {
         }
     }
 
-    pub fn set(&mut self, consequence: &Consequence) {
+    pub fn set(&mut self, consequence: Consequence) {
         let index = self.index(consequence);
         self.data[index] = consequence.weight
     }
 
-    pub fn get_starts_at(&self, item: Item, start: u64) -> Option<Consequence> {
-        for end in start + 1..=self.sentence_length {
-            let index = self.index(&Consequence {
-                start,
-                item,
-                end,
-                weight: 0.0,
-            });
-            if self.data[index] != 0.0 {
-                // TODO what to do if there are multiple options
-                return Some(Consequence {
-                    start,
-                    item,
-                    end,
-                    weight: self.data[index],
-                });
-            }
+    pub fn get_starts_at(&self, item: Item, start: u64) -> impl Iterator<Item = Consequence> {
+        WeightMapIterator {
+            sentence_length: self.sentence_length,
+            data: &self.data,
+            item,
+            fixed: start,
+            pos: start + 1,
+            start: true,
         }
-        None
     }
 
-    pub fn get_ends_at(&self, item: Item, end: u64) -> Option<Consequence> {
-        for start in 0..end {
-            let index = self.index(&Consequence {
-                start,
-                item,
-                end,
-                weight: 0.0,
-            });
-            if self.data[index] != 0.0 {
-                // TODO what to do if there are multiple options
-                return Some(Consequence {
-                    start,
-                    item,
-                    end,
-                    weight: self.data[index],
-                });
-            }
+    pub fn get_ends_at(&self, item: Item, end: u64) -> impl Iterator<Item = Consequence> {
+        WeightMapIterator {
+            sentence_length: self.sentence_length,
+            data: &self.data,
+            item,
+            fixed: end,
+            pos: 0,
+            start: false,
         }
-        None
     }
+
     pub fn convert_to_parse_tree(
         self,
         initial: Item,
         string_lookup: HashMap<String, u64>,
     ) -> ParseTree<String> {
         // let mut tree = ParseTree::default();
-        // tree.root = string_lookup[1];
+        // tree.root = string_lookup[];
         todo!();
     }
 }
@@ -262,7 +309,7 @@ mod test {
             for x in 0..SENTENCE {
                 for y in x + 1..=SENTENCE {
                     eprintln!("{rule}({x}{y})");
-                    weight_map.set(&Consequence {
+                    weight_map.set(Consequence {
                         start: x,
                         item: Item::NonTerminal(rule),
                         end: y,
@@ -274,7 +321,7 @@ mod test {
         for rule in 0..RULES {
             for x in 0..SENTENCE {
                 for y in x + 1..=SENTENCE {
-                    let value = weight_map.get_consequence(&Consequence {
+                    let value = weight_map.get_consequence(Consequence {
                         start: x,
                         item: Item::NonTerminal(rule),
                         end: y,
@@ -284,5 +331,71 @@ mod test {
                 }
             }
         }
+    }
+
+    #[test]
+    fn weightmap_starts_at_test() {
+        const RULES: u64 = 4;
+        const SENTENCE: u64 = 4;
+        let mut weight_map = WeightMap::with_capacity(RULES as usize, SENTENCE as usize);
+        let consequence1 = Consequence {
+            start: 0,
+            item: Item::NonTerminal(1),
+            end: 1,
+            weight: 0.1,
+        };
+        weight_map.set(consequence1);
+        let consequence2 = Consequence {
+            start: 0,
+            item: Item::NonTerminal(1),
+            end: 3,
+            weight: 0.1,
+        };
+        weight_map.set(consequence2);
+        let consequence3 = Consequence {
+            start: 1,
+            item: Item::NonTerminal(1),
+            end: 3,
+            weight: 0.1,
+        };
+        weight_map.set(consequence3);
+
+        let mut iter = weight_map.get_starts_at(Item::NonTerminal(1), 0);
+        assert_eq!(iter.next(), Some(consequence1));
+        assert_eq!(iter.next(), Some(consequence2));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn weightmap_ends_at_test() {
+        const RULES: u64 = 4;
+        const SENTENCE: u64 = 4;
+        let mut weight_map = WeightMap::with_capacity(RULES as usize, SENTENCE as usize);
+        let consequence1 = Consequence {
+            start: 0,
+            item: Item::NonTerminal(1),
+            end: 4,
+            weight: 0.1,
+        };
+        weight_map.set(consequence1);
+        let consequence2 = Consequence {
+            start: 3,
+            item: Item::NonTerminal(1),
+            end: 4,
+            weight: 0.1,
+        };
+        weight_map.set(consequence2);
+        let consequence3 = Consequence {
+            start: 1,
+            item: Item::NonTerminal(1),
+            end: 3,
+            weight: 0.1,
+        };
+        weight_map.set(consequence3);
+
+        let mut iter = weight_map.get_ends_at(Item::NonTerminal(1), 4);
+        assert_eq!(iter.next(), Some(consequence1));
+        assert_eq!(iter.next(), Some(consequence2));
+        assert_eq!(iter.next(), None);
     }
 }

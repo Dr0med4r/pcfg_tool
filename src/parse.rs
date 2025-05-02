@@ -102,11 +102,11 @@ pub fn deduce(
     }
     let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     while let Some(consequence) = queue.pop() {
-        if weight_map.get_consequence(&consequence) != 0.0 {
+        if weight_map.get_consequence(consequence) != 0.0 {
             continue;
         }
-        weight_map.set(&consequence);
-        if weight_map.get_consequence(&Consequence {
+        weight_map.set(consequence);
+        if weight_map.get_consequence(Consequence {
             start: 0,
             item: start_item,
             end: sentence_length as u64,
@@ -155,7 +155,7 @@ fn add_right(
     // then Consequence {start: item1.start, item: lhs, end: itemn.end } is added
     if consequence.item == rule.rhs[rule.rhs.len() - 1] {
         for item in rule.rhs[..rule.rhs.len() - 1].iter().rev() {
-            if let Some(next) = weight_map.get_ends_at(*item, consequence.start) {
+            for next in weight_map.get_ends_at(*item, consequence.start) {
                 eprintln!("add {:?} left of {:?}", &next, &consequence);
                 queue.push(Consequence {
                     start: next.start,
@@ -180,7 +180,7 @@ fn add_left(
     // then Consequence {start: item1.start, item: lhs, end: itemn.end } is added
     if consequence.item == rule.rhs[0] {
         for item in &rule.rhs[1..] {
-            if let Some(next) = weight_map.get_starts_at(*item, consequence.end) {
+            for next in weight_map.get_starts_at(*item, consequence.end) {
                 eprintln!("add {:?} right of {:?}", &next, &consequence);
                 queue.push(Consequence {
                     start: consequence.start,
@@ -393,31 +393,31 @@ mod test {
         // W2: 3
         // T: 4
         // ROOT: 5
-        desired_weight_map.set(&Consequence {
+        desired_weight_map.set(Consequence {
             start: 0,
             item: Item::NonTerminal(1),
             end: 1,
             weight: 0.2,
         });
-        desired_weight_map.set(&Consequence {
+        desired_weight_map.set(Consequence {
             start: 1,
             item: Item::NonTerminal(3),
             end: 2,
             weight: 1.0,
         });
-        desired_weight_map.set(&Consequence {
+        desired_weight_map.set(Consequence {
             start: 2,
             item: Item::NonTerminal(1),
             end: 3,
             weight: 0.2,
         });
-        desired_weight_map.set(&Consequence {
+        desired_weight_map.set(Consequence {
             start: 1,
             item: Item::NonTerminal(1),
             end: 2,
             weight: 0.6,
         });
-        desired_weight_map.set(&Consequence {
+        desired_weight_map.set(Consequence {
             start: 0,
             item: Item::NonTerminal(5),
             end: 2,
