@@ -8,7 +8,7 @@ pub struct StringLookup {
 }
 
 impl StringLookup {
-    pub fn insert(&mut self, value: String) -> usize {
+    pub fn insert_and_get(&mut self, value: String) -> usize {
         self.data.insert_full(value).0
     }
 

@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 
 use super::weight_map::Item;
 
-
 #[derive(Clone, Copy, Debug)]
 pub struct Consequence {
     pub start: u64,
@@ -15,7 +14,10 @@ impl Eq for Consequence {}
 
 impl PartialEq for Consequence {
     fn eq(&self, other: &Self) -> bool {
-        self.start == other.start && self.item == other.item && self.end == other.end
+        self.start == other.start
+            && self.item == other.item
+            && self.end == other.end
+            && self.weight == other.weight
     }
 }
 
@@ -27,12 +29,20 @@ impl PartialOrd for Consequence {
 
 impl Ord for Consequence {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.weight < other.weight {
-            Ordering::Less
-        } else if self.weight > other.weight {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
+        self.weight.partial_cmp(&other.weight).unwrap()
+        // match self.weight.total_cmp(&other.weight) {
+        //     Ordering::Equal => {
+        //         let item = self.item.cmp(&other.item);
+        //         if item != Ordering::Equal {
+        //             return item
+        //         }
+        //         let start = self.start.cmp(&other.start);
+        //         if start != Ordering::Equal {
+        //             return start;
+        //         }
+        //         self.end.cmp(&other.end)
+        //     }
+        //     ord => ord,
+        // }
     }
 }

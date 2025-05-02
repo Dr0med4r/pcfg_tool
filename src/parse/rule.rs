@@ -1,8 +1,12 @@
 use std::process::exit;
 
 use nom::{
-    Parser, bytes::complete::is_a, character::complete::char, character::complete::space0,
-    combinator::map, multi::many_till, sequence::delimited,
+    Parser,
+    character::complete::{char, space0},
+    combinator::map,
+    multi::many_till,
+    number::complete::recognize_float,
+    sequence::delimited,
 };
 use std::hash::Hash;
 
@@ -36,7 +40,7 @@ impl Rule<String> {
         let to_string = |e: &str| e.to_string();
         let to_float = |e: &str| {
             e.parse::<f64>().unwrap_or_else(|e| {
-                eprintln!("{e}");
+                eprintln!("parsing rule \"{input}\": {e}");
                 exit(1)
             })
         };
@@ -46,14 +50,14 @@ impl Rule<String> {
             char('>'),
             many_till(
                 map(atom, to_string),
-                map(delimited(space0, is_a("1234567890."), space0), to_float),
+                map(delimited(space0, recognize_float, space0), to_float),
             ),
         )
             .parse(input)
         {
             Ok(a) => a,
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("parsing rule \"{input}\": {e}");
                 exit(1);
             }
         };
@@ -64,7 +68,7 @@ impl Rule<String> {
         let to_string = |e: &str| e.to_string();
         let to_float = |e: &str| {
             e.parse::<f64>().unwrap_or_else(|e| {
-                eprintln!("lexicon parsing: {e}");
+                eprintln!("parsing lexicon \"{input}\": {e}");
                 exit(1)
             })
         };
@@ -77,7 +81,7 @@ impl Rule<String> {
         {
             Ok(a) => a,
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("parsing lexicon \"{input}\": {e}");
                 exit(1);
             }
         };

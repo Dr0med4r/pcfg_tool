@@ -39,8 +39,21 @@ fn main() {
             }
             let mut string_lookup = StringLookup::default();
             let mut rule_lookup = HashMap::new();
-            parse_rules(&mut string_lookup, &mut rule_lookup, rules, true);
-            parse_rules(&mut string_lookup, &mut rule_lookup, lexicon, false);
+            let mut all_rules = HashMap::new();
+            parse_rules(
+                &mut string_lookup,
+                &mut rule_lookup,
+                &mut all_rules,
+                rules,
+                true,
+            );
+            parse_rules(
+                &mut string_lookup,
+                &mut rule_lookup,
+                &mut all_rules,
+                lexicon,
+                false,
+            );
             for (line_number, line) in io::stdin().lines().enumerate() {
                 let Ok(line) = line else {
                     eprintln!("error reading line {}", line_number + 1);
@@ -55,12 +68,18 @@ fn main() {
                 );
                 rule_lookup.entry(initial_nonterminal).or_default();
                 let rule_weights = deduce(
-                    line_items,
+                    &line_items,
                     &rule_lookup,
                     initial_nonterminal,
                     string_lookup.len(),
                 );
-                match rule_weights.convert_to_parse_tree(initial_nonterminal, &string_lookup) {
+                match rule_weights.convert_to_parse_tree(
+                    initial_nonterminal,
+                    0,
+                    line_items.len() as u64,
+                    &string_lookup,
+                    &all_rules,
+                ) {
                     Some(tree) => {
                         println!("{tree}")
                     }
