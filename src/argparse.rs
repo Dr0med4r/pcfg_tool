@@ -34,13 +34,13 @@ pub enum Commands {
         smoothing: bool,
         /// use beam search with threshhold
         #[arg(short, long)]
-        threshold_beam: u64,
+        threshold_beam: Option<u64>,
         /// use beam search with constant size
         #[arg(short, long)]
-        rank_beam: u64,
+        rank_beam: Option<u64>,
         /// use a star search
         #[arg(short, long)]
-        astar: PathBuf,
+        astar: Option<PathBuf>,
     },
     Binarise {},
     Debinarise {},
