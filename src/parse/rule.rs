@@ -1,0 +1,90 @@
+use std::process::exit;
+
+use nom::{
+    Parser, bytes::complete::is_a, character::complete::char, character::complete::space0,
+    combinator::map, multi::many_till, sequence::delimited,
+};
+use std::hash::Hash;
+
+use crate::induce::parse_tree::atom;
+
+#[derive(Debug)]
+pub struct Rule<T> {
+    pub lhs: T,
+    pub rhs: Vec<T>,
+    pub weight: f64,
+}
+
+impl<T: Hash> Hash for Rule<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.lhs.hash(state);
+        self.rhs.hash(state);
+    }
+}
+
+impl<T: Eq> Eq for Rule<T> {}
+
+impl<T: PartialEq> PartialEq for Rule<T> {
+    fn eq(&self, other: &Self) -> bool {
+        // do not check the weight as there is only one rule in the grammar file
+        self.lhs == other.lhs && self.rhs == other.rhs
+    }
+}
+
+impl Rule<String> {
+    pub(crate) fn from_rule(input: &str) -> Self {
+        let to_string = |e: &str| e.to_string();
+        let to_float = |e: &str| {
+            e.parse::<f64>().unwrap_or_else(|e| {
+                eprintln!("{e}");
+                exit(1)
+            })
+        };
+        let (_, (lhs, _, _, (rhs, weight))) = match (
+            map(atom, to_string),
+            char('-'),
+            char('>'),
+            many_till(
+                map(atom, to_string),
+                map(delimited(space0, is_a("1234567890."), space0), to_float),
+            ),
+        )
+            .parse(input)
+        {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("{}", e);
+                exit(1);
+            }
+        };
+        Rule { lhs, rhs, weight }
+    }
+
+    pub(crate) fn from_lexicon(input: &str) -> Self {
+        let to_string = |e: &str| e.to_string();
+        let to_float = |e: &str| {
+            e.parse::<f64>().unwrap_or_else(|e| {
+                eprintln!("lexicon parsing: {e}");
+                exit(1)
+            })
+        };
+        let (_, (lhs, rhs, weight)) = match (
+            map(atom, to_string),
+            map(atom, to_string),
+            map(atom, to_float),
+        )
+            .parse(input)
+        {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("{}", e);
+                exit(1);
+            }
+        };
+        Rule {
+            lhs,
+            rhs: vec![rhs],
+            weight,
+        }
+    }
+}

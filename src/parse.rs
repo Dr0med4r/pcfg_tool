@@ -1,4 +1,6 @@
-pub mod structures;
+pub mod weight_map;
+pub mod consequence;
+pub mod rule;
 
 use std::{
     collections::BinaryHeap,
@@ -8,9 +10,11 @@ use std::{
     process::exit,
 };
 
+use consequence::Consequence;
 use foldhash::HashMap;
 use foldhash::HashSet;
-use structures::{Consequence, Item, Rule, WeightMap};
+use weight_map::{ Item, WeightMap};
+use crate::parse::rule::Rule;
 
 /// appends rules into all_rules and all nonterminals as keys into lookup_rules
 pub fn parse_rules(
@@ -73,7 +77,7 @@ fn insert_rule_into_map(
     }
 }
 
-pub fn transform_sentence(line: String, lexicon: &HashMap<String, u64>) -> Vec<Item> {
+pub fn transform_sentence(line: &str, lexicon: &HashMap<String, u64>) -> Vec<Item> {
     line.split_whitespace()
         .map(|word| Item::Terminal(*lexicon.get(word).expect("this word is not in the lexicon")))
         .collect()
@@ -92,7 +96,7 @@ pub fn deduce(
             .get(word)
             .expect("there is no rule that produces the word")
         {
-            queue.push(structures::Consequence {
+            queue.push(Consequence {
                 start: index as u64,
                 item: rule.lhs,
                 end: (index + 1) as u64,
@@ -196,13 +200,12 @@ fn add_left(
 #[cfg(test)]
 mod test {
     use foldhash::HashMapExt;
-    use structures::*;
 
     use super::*;
     #[test]
     fn from_string_test() {
         let rule = "A -> B 0.5";
-        let rule = structures::Rule::from_rule(rule);
+        let rule = Rule::from_rule(rule);
         assert_eq!(
             Rule {
                 lhs: "A".to_string(),
@@ -212,7 +215,7 @@ mod test {
             rule
         );
         let rule = " ROOT -> B C D 0.57   ";
-        let rule = structures::Rule::from_rule(rule);
+        let rule = Rule::from_rule(rule);
         assert_eq!(
             Rule {
                 lhs: "ROOT".to_string(),

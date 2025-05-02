@@ -12,7 +12,7 @@ use argparse::{Args, Commands};
 use clap::Parser;
 use foldhash::{HashMap, HashMapExt};
 use induce::{induce_grammar, write_grammar};
-use parse::{deduce, parse_rules, structures::Item, transform_sentence};
+use parse::{deduce, parse_rules, weight_map::Item, transform_sentence};
 
 fn main() {
     let args = Args::parse();
@@ -44,7 +44,7 @@ fn main() {
                     eprintln!("error reading line {}", line_number + 1);
                     exit(1);
                 };
-                let line = transform_sentence(line, &string_lookup);
+                let line_items = transform_sentence(&line, &string_lookup);
                 let initial_nonterminal = Item::NonTerminal(
                     *string_lookup
                         .get(initial_nonterminal)
@@ -52,8 +52,11 @@ fn main() {
                 );
                 rule_lookup.entry(initial_nonterminal).or_default();
                 let rule_weights =
-                    deduce(line, &rule_lookup, initial_nonterminal, string_lookup.len());
-                // if rule_weights.get_consequence(consequence) {}
+                    deduce(line_items, &rule_lookup, initial_nonterminal, string_lookup.len());
+                match rule_weights.convert_to_parse_tree(initial_nonterminal, &string_lookup) {
+                    Some(tree) => {println!("{tree}")}
+                    None => {println!("(NOPARSE {})", line)}
+                }
             }
         }
 
