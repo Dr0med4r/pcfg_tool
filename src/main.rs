@@ -12,7 +12,9 @@ use argparse::{Args, Commands};
 use clap::Parser;
 use foldhash::{HashMap, HashMapExt};
 use induce::{induce_grammar, write_grammar};
-use parse::{deduce, parse_rules, weight_map::Item, transform_sentence};
+use parse::{
+    deduce, parse_rules, string_lookup::StringLookup, transform_sentence, weight_map::Item,
+};
 
 fn main() {
     let args = Args::parse();
@@ -35,7 +37,7 @@ fn main() {
                 Some(paradigma) if paradigma == &"cyk".to_string() => exit(22),
                 _ => {}
             }
-            let mut string_lookup = HashMap::new();
+            let mut string_lookup = StringLookup::default();
             let mut rule_lookup = HashMap::new();
             parse_rules(&mut string_lookup, &mut rule_lookup, rules, true);
             parse_rules(&mut string_lookup, &mut rule_lookup, lexicon, false);
@@ -46,16 +48,25 @@ fn main() {
                 };
                 let line_items = transform_sentence(&line, &string_lookup);
                 let initial_nonterminal = Item::NonTerminal(
-                    *string_lookup
+                    string_lookup
                         .get(initial_nonterminal)
-                        .expect("initial nonterminal is not in the rules"),
+                        .expect("initial nonterminal is not in the rules")
+                        as u64,
                 );
                 rule_lookup.entry(initial_nonterminal).or_default();
-                let rule_weights =
-                    deduce(line_items, &rule_lookup, initial_nonterminal, string_lookup.len());
+                let rule_weights = deduce(
+                    line_items,
+                    &rule_lookup,
+                    initial_nonterminal,
+                    string_lookup.len(),
+                );
                 match rule_weights.convert_to_parse_tree(initial_nonterminal, &string_lookup) {
-                    Some(tree) => {println!("{tree}")}
-                    None => {println!("(NOPARSE {})", line)}
+                    Some(tree) => {
+                        println!("{tree}")
+                    }
+                    None => {
+                        println!("(NOPARSE {})", line)
+                    }
                 }
             }
         }

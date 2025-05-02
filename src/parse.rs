@@ -1,6 +1,7 @@
-pub mod weight_map;
 pub mod consequence;
 pub mod rule;
+pub mod string_lookup;
+pub mod weight_map;
 
 use std::{
     collections::BinaryHeap,
@@ -10,15 +11,16 @@ use std::{
     process::exit,
 };
 
+use crate::parse::rule::Rule;
 use consequence::Consequence;
 use foldhash::HashMap;
 use foldhash::HashSet;
-use weight_map::{ Item, WeightMap};
-use crate::parse::rule::Rule;
+use string_lookup::StringLookup;
+use weight_map::{Item, WeightMap};
 
 /// appends rules into all_rules and all nonterminals as keys into lookup_rules
 pub fn parse_rules(
-    string_map: &mut HashMap<String, u64>,
+    string_map: &mut StringLookup,
     rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
     path: &Path,
     is_rule: bool,
@@ -27,21 +29,19 @@ pub fn parse_rules(
         eprintln!("cannot open rules file");
         exit(1);
     };
-    let mut rule_count: u64 = 0;
     for line in BufReader::new(rules).lines() {
         let Ok(line) = line else {
             eprintln!("cannot read rule");
             exit(1);
         };
-        insert_rule_into_map(string_map, is_rule, rhs_grammar, &mut rule_count, line);
+        insert_rule_into_map(string_map, is_rule, rhs_grammar, line);
     }
 }
 
 fn insert_rule_into_map(
-    string_map: &mut HashMap<String, u64>,
+    string_map: &mut StringLookup,
     is_rule: bool,
     rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
-    nonterminal_count: &mut u64,
     line: String,
 ) {
     let rule = if is_rule {
@@ -51,22 +51,14 @@ fn insert_rule_into_map(
     };
     let mut rhs = Vec::new();
     for nonterminal in rule.rhs {
-        let item = *string_map.entry(nonterminal).or_insert_with(|| {
-            let count = *nonterminal_count;
-            *nonterminal_count += 1;
-            count
-        });
+        let item = string_map.insert(nonterminal) as u64;
         rhs.push(if is_rule {
             Item::NonTerminal(item)
         } else {
             Item::Terminal(item)
         });
     }
-    let lhs = Item::NonTerminal(*string_map.entry(rule.lhs).or_insert_with(|| {
-        let lhs = *nonterminal_count;
-        *nonterminal_count += 1;
-        lhs
-    }));
+    let lhs = Item::NonTerminal(string_map.insert(rule.lhs) as u64);
     for nonterminal in &rhs.clone() {
         let set = rhs_grammar.entry(*nonterminal).or_default();
         set.insert(Rule {
@@ -77,9 +69,11 @@ fn insert_rule_into_map(
     }
 }
 
-pub fn transform_sentence(line: &str, lexicon: &HashMap<String, u64>) -> Vec<Item> {
+pub fn transform_sentence(line: &str, lexicon: &StringLookup) -> Vec<Item> {
     line.split_whitespace()
-        .map(|word| Item::Terminal(*lexicon.get(word).expect("this word is not in the lexicon")))
+        .map(|word| {
+            Item::Terminal(lexicon.get(word).expect("this word is not in the lexicon") as u64)
+        })
         .collect()
 }
 
@@ -228,23 +222,13 @@ mod test {
 
     #[test]
     fn into_map_from_rules_test() {
-        let mut string_map = HashMap::new();
+        let mut string_map = StringLookup::default();
         let is_rule = true;
         let mut rhs_grammar = HashMap::new();
-        let mut nonterminal_count = 0;
         let line = "A -> B C 0.57".to_string();
-        insert_rule_into_map(
-            &mut string_map,
-            is_rule,
-            &mut rhs_grammar,
-            &mut nonterminal_count,
-            line,
-        );
-        let desired_strings = HashMap::from_iter(vec![
-            ("B".to_string(), 0),
-            ("C".to_string(), 1),
-            ("A".to_string(), 2),
-        ]);
+        insert_rule_into_map(&mut string_map, is_rule, &mut rhs_grammar, line);
+        let desired_strings =
+            StringLookup::from_iter(vec!["B".to_string(), "C".to_string(), "A".to_string()]);
         assert_eq!(desired_strings, string_map);
         let desired_grammar = HashMap::from_iter(vec![
             (
@@ -269,19 +253,13 @@ mod test {
 
     #[test]
     fn into_map_from_lexicon_test() {
-        let mut string_map = HashMap::new();
+        let mut string_map = StringLookup::default();
         let is_rule = false;
         let mut rhs_grammar = HashMap::new();
-        let mut nonterminal_count = 0;
         let line = "A C 0.57".to_string();
-        insert_rule_into_map(
-            &mut string_map,
-            is_rule,
-            &mut rhs_grammar,
-            &mut nonterminal_count,
-            line,
-        );
-        let desired_strings = HashMap::from_iter(vec![("C".to_string(), 0), ("A".to_string(), 1)]);
+        insert_rule_into_map(&mut string_map, is_rule, &mut rhs_grammar, line);
+        let desired_strings =
+            StringLookup::from_iter(vec!["C".to_string(), "A".to_string()]);
         assert_eq!(desired_strings, string_map);
         let desired_grammar = HashMap::from_iter(vec![(
             Item::Terminal(0),
@@ -296,30 +274,17 @@ mod test {
 
     #[test]
     fn into_map_from_both_test() {
-        let mut string_map = HashMap::new();
+        let mut string_map = StringLookup::default();
         let mut rhs_grammar = HashMap::new();
-        let mut nonterminal_count = 0;
         let lexicon_line = "B D 0.57".to_string();
-        insert_rule_into_map(
-            &mut string_map,
-            false,
-            &mut rhs_grammar,
-            &mut nonterminal_count,
-            lexicon_line,
-        );
+        insert_rule_into_map(&mut string_map, false, &mut rhs_grammar, lexicon_line);
         let rule_line = "A -> B C 0.57".to_string();
-        insert_rule_into_map(
-            &mut string_map,
-            true,
-            &mut rhs_grammar,
-            &mut nonterminal_count,
-            rule_line,
-        );
-        let desired_strings = HashMap::from_iter(vec![
-            ("D".to_string(), 0),
-            ("B".to_string(), 1),
-            ("C".to_string(), 2),
-            ("A".to_string(), 3),
+        insert_rule_into_map(&mut string_map, true, &mut rhs_grammar, rule_line);
+        let desired_strings = StringLookup::from_iter(vec![
+            "D".to_string(),
+            "B".to_string(),
+            "C".to_string(),
+            "A".to_string(),
         ]);
         assert_eq!(desired_strings, string_map);
         let desired_grammar = HashMap::from_iter(vec![
@@ -353,22 +318,15 @@ mod test {
 
     #[test]
     fn deduce_test() {
-        let mut string_map = HashMap::new();
+        let mut string_map = StringLookup::default();
         let mut grammar = HashMap::new();
-        let mut nonterminal_count = 0;
         let lexicon = vec![
             "W1 R 0.2".to_string(),
             "W2 S 1".to_string(),
             "W1 T 0.2".to_string(),
         ];
         for line in lexicon {
-            insert_rule_into_map(
-                &mut string_map,
-                false,
-                &mut grammar,
-                &mut nonterminal_count,
-                line,
-            );
+            insert_rule_into_map(&mut string_map, false, &mut grammar, line);
         }
         let rules = vec![
             "ROOT -> W1 W2 0.25".to_string(),
@@ -376,19 +334,13 @@ mod test {
             "W1 -> W2 0.6".to_string(),
         ];
         for line in rules {
-            insert_rule_into_map(
-                &mut string_map,
-                true,
-                &mut grammar,
-                &mut nonterminal_count,
-                line,
-            );
+            insert_rule_into_map(&mut string_map, true, &mut grammar, line);
         }
         eprintln!("grammar: \n{:#?}", grammar);
-        let initial = Item::NonTerminal(*string_map.get("ROOT").unwrap());
+        let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u64);
         grammar.entry(initial).or_default();
 
-        let line = transform_sentence("R S T".to_string(), &string_map);
+        let line = transform_sentence("R S T", &string_map);
         let mut desired_weight_map = WeightMap::with_capacity(string_map.len(), line.len());
         // R: 0
         // W1: 1

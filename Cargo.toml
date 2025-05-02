@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5.35", features = ["derive"] }
 foldhash = "0.1.5"
+indexmap = "2.9.0"
 nom = "8.0.0"

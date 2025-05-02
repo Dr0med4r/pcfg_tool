@@ -2,7 +2,7 @@ use foldhash::HashMap;
 
 use crate::induce::parse_tree::ParseTree;
 
-use super::consequence::Consequence;
+use super::{consequence::Consequence, string_lookup::StringLookup};
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Clone, Copy)]
 pub enum Item {
@@ -15,6 +15,14 @@ impl From<Item> for u64 {
         match val {
             Item::NonTerminal(u) => u,
             Item::Terminal(u) => u,
+        }
+    }
+}
+impl From<Item> for usize {
+    fn from(val: Item) -> Self {
+        match val {
+            Item::NonTerminal(u) => u as usize,
+            Item::Terminal(u) => u as usize,
         }
     }
 }
@@ -163,12 +171,14 @@ impl WeightMap {
     }
 
     pub fn convert_to_parse_tree(
-        self,
+        &self,
         initial: Item,
-        string_lookup: &HashMap<String, u64>,
+        string_lookup: &StringLookup,
     ) -> Option<ParseTree<String>> {
         // let mut tree = ParseTree::default();
-        // tree.root = string_lookup[];
+        // tree.root = string_lookup.get_string(usize::from(initial));
+        // let a = vec!["a"];
+        // tree.children = a;
         todo!();
     }
 }
