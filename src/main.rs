@@ -37,6 +37,14 @@ fn main() {
                 Some(paradigma) if paradigma == &"cyk".to_string() => exit(22),
                 _ => {}
             }
+            if *unking
+                || *smoothing
+                || threshold_beam.is_some()
+                || rank_beam.is_some()
+                || astar.is_some()
+            {
+                exit(22);
+            }
             let mut string_lookup = StringLookup::default();
             let mut rule_lookup = HashMap::new();
             let mut all_rules = HashMap::new();
@@ -73,19 +81,19 @@ fn main() {
                     initial_nonterminal,
                     string_lookup.len(),
                 );
-                match rule_weights.convert_to_parse_tree(
-                    initial_nonterminal,
-                    0,
-                    line_items.len() as u64,
-                    &string_lookup,
-                    &all_rules,
-                ) {
-                    Some(tree) => {
-                        println!("{tree}")
-                    }
-                    None => {
-                        println!("(NOPARSE {})", line)
-                    }
+                if rule_weights.get_with_index(initial_nonterminal, 0, line_items.len() as u64)
+                    == 0.0
+                {
+                    println!("(NOPARSE {})", line)
+                } else {
+                    let tree = rule_weights.convert_to_parse_tree(
+                        initial_nonterminal,
+                        0,
+                        line_items.len() as u64,
+                        &string_lookup,
+                        &all_rules,
+                    );
+                    println!("{tree}")
                 }
             }
         }

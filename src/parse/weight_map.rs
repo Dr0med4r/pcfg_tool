@@ -1,4 +1,4 @@
-use foldhash::{HashMap, HashSet};
+use foldhash::HashMap;
 
 use crate::induce::parse_tree::ParseTree;
 
@@ -98,12 +98,12 @@ impl Iterator for WeightMapIterator<'_> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct WeightMap {
-    data: Vec<f64>,
+pub struct WeightMap<T> {
+    data: Vec<T>,
     sentence_length: u64,
 }
 
-impl WeightMap {
+impl WeightMap<f64> {
     fn elements(len: u64) -> u64 {
         (len * (len + 1)) / 2
     }
@@ -176,104 +176,59 @@ impl WeightMap {
         end: u64,
         string_lookup: &StringLookup,
         all_rules: &HashMap<Item, HashMap<Vec<Item>, f64>>,
-    ) -> Option<ParseTree<String>> {
-        if self.get_with_index(initial, start, end) == 0.0 {
-            return None;
-        }
+    ) -> ParseTree<String> {
         let root = string_lookup
             .get_string(usize::from(initial))
             .unwrap()
             .clone();
         let mut children = Vec::new();
-        eprintln!(
-            "initial: {:?}, {}",
-            initial,
-            self.get_with_index(initial, start, end)
-        );
+        if let Item::Terminal(_) = initial {
+            return ParseTree { root, children };
+        }
         // check all rules if it is the rule applied
         'rule: for (rhs, weight) in all_rules.get(&initial).unwrap() {
             if rhs.len() == 1 {
                 let rhs = rhs[0];
-                eprintln!("try replace with {:?}, {}", rhs, weight);
-
-                match rhs {
-                    Item::NonTerminal(_) => {
-                        if (self.get_with_index(rhs, start, end)
-                            - self.get_with_index(initial, start, end) / weight)
-                            .abs()
-                            < 1e-7
-                        {
-                            children.push(
-                                self.convert_to_parse_tree(
-                                    rhs,
-                                    start,
-                                    end,
-                                    string_lookup,
-                                    all_rules,
-                                )
-                                .unwrap(),
-                            );
-                            break;
-                        }
-                    }
-                    Item::Terminal(item) => {
-                        eprintln!("rhs: {}", self.get_with_index(rhs, start, end));
-                        eprintln!("initial: {}", self.get_with_index(initial, start, end));
-                        if (self.get_with_index(rhs, start, end)
-                            - self.get_with_index(initial, start, end))
-                        .abs()
-                            < 1e-7
-                        {
-                            return Some(ParseTree {
-                                root: string_lookup.get_string(item as usize).unwrap().clone(),
-                                children: vec![],
-                            });
-                        }
-                        continue;
-                    }
+                let weight_of_rhs = self.get_with_index(rhs, start, end);
+                let weight_of_lhs = self.get_with_index(initial, start, end);
+                if weight_of_rhs * weight == weight_of_lhs {
+                    children.push(self.convert_to_parse_tree(
+                        rhs,
+                        start,
+                        end,
+                        string_lookup,
+                        all_rules,
+                    ));
+                    break;
                 }
                 continue;
             }
             for l in self.get_starts_at(rhs[0], start) {
                 for r in self.get_ends_at(rhs[1], end) {
-                    eprintln!("left: {:#?} right: {:#?}", l, r);
-                    if (l.weight * r.weight - self.get_with_index(initial, start, end) / weight)
-                        .abs()
-                        < 1e-6
-                    {
-                        eprintln!("do expand");
-                        children.push(
-                            self.convert_to_parse_tree(
-                                l.item,
-                                l.start,
-                                l.end,
-                                string_lookup,
-                                all_rules,
-                            )
-                            .unwrap(),
-                        );
-                        children.push(
-                            self.convert_to_parse_tree(
-                                r.item,
-                                r.start,
-                                r.end,
-                                string_lookup,
-                                all_rules,
-                            )
-                            .unwrap(),
-                        );
+                    if l.weight * r.weight * weight == self.get_with_index(initial, start, end) {
+                        children.push(self.convert_to_parse_tree(
+                            l.item,
+                            l.start,
+                            l.end,
+                            string_lookup,
+                            all_rules,
+                        ));
+                        children.push(self.convert_to_parse_tree(
+                            r.item,
+                            r.start,
+                            r.end,
+                            string_lookup,
+                            all_rules,
+                        ));
                         break 'rule;
                     }
                 }
             }
-            if self.get_with_index(initial, start, end) == 1e-5 {
-                println!("hello");
-            }
         }
         if children.is_empty() {
-            return None;
+            panic!("convert probably called on unparsable tree")
         }
-        Some(ParseTree { root, children })
+        ParseTree { root, children }
         // let mut tree = ParseTree::default();
         // tree.root = string_lookup.get_string(usize::from(initial));
         // let a = vec!["a"];
@@ -411,7 +366,7 @@ mod test {
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u64);
         grammar.entry(initial).or_default();
 
-        let line = transform_sentence("R S T", &string_map);
+        let line = transform_sentence("T S", &string_map);
         let weight_map = deduce(&line, &grammar, initial, string_map.len());
         let tree = weight_map.convert_to_parse_tree(
             initial,
@@ -420,15 +375,54 @@ mod test {
             &string_map,
             &all_rules,
         );
-        assert_eq!(None, tree);
-        let line = transform_sentence("R S", &string_map);
-        let tree = weight_map
-            .convert_to_parse_tree(initial, 0, line.len() as u64, &string_map, &all_rules)
-            .unwrap();
         let desired_tree = ParseTree {
             root: "ROOT".to_string(),
-            children: vec![],
+            children: vec![
+                ParseTree {
+                    root: "W1".to_string(),
+                    children: vec![ParseTree {
+                        root: "T".to_string(),
+                        children: vec![],
+                    }],
+                },
+                ParseTree {
+                    root: "W2".to_string(),
+                    children: vec![ParseTree {
+                        root: "S".to_string(),
+                        children: vec![],
+                    }],
+                },
+            ],
         };
         assert_eq!(desired_tree, tree);
+    }
+
+    #[test]
+    #[should_panic]
+    fn convert_to_parse_panic_test() {
+        let mut string_map = StringLookup::default();
+        let mut grammar = HashMap::new();
+        let mut all_rules = HashMap::new();
+        let lexicon = vec![
+            "W1 R 0.1".to_string(),
+            "W2 S 1".to_string(),
+            "W1 T 0.3".to_string(),
+        ];
+        for line in lexicon {
+            insert_rule_into_map(&mut string_map, false, &mut grammar, &mut all_rules, line);
+        }
+        let rules = vec![
+            "ROOT -> W1 W2 0.25".to_string(),
+            "ROOT -> W2 W2 0.75".to_string(),
+            "W1 -> W2 0.6".to_string(),
+        ];
+        for line in rules {
+            insert_rule_into_map(&mut string_map, true, &mut grammar, &mut all_rules, line);
+        }
+        let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u64);
+        grammar.entry(initial).or_default();
+        let line = transform_sentence("R S T", &string_map);
+        let weight_map = deduce(&line, &grammar, initial, string_map.len());
+        weight_map.convert_to_parse_tree(initial, 0, line.len() as u64, &string_map, &all_rules);
     }
 }

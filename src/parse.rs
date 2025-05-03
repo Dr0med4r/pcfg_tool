@@ -87,24 +87,16 @@ pub fn deduce(
     rule_lookup: &HashMap<Item, HashSet<Rule<Item>>>,
     start_item: Item,
     number_of_items: usize,
-) -> WeightMap {
+) -> WeightMap<f64> {
     let mut queue = BinaryHeap::new();
     let sentence_length = line.len();
     for (index, word) in line.iter().enumerate() {
-        for rule in rule_lookup
-            .get(word)
-            .expect("there is no rule that produces the word")
-        {
-            // TODO maybe add new item to consequence where it is marked when the terminal has to
-            // be added or it will never be added
-            // or maybe some different Idea
             queue.push(Consequence {
                 start: index as u64,
-                item: rule.lhs,
+                item: *word,
                 end: (index + 1) as u64,
-                weight: rule.weight,
+                weight: 1.0,
             });
-        }
     }
     let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     while let Some(consequence) = queue.pop() {
@@ -149,7 +141,7 @@ fn add_replace(queue: &mut BinaryHeap<Consequence>, rule: &Rule<Item>, consequen
 
 fn add_right(
     queue: &mut BinaryHeap<Consequence>,
-    weight_map: &WeightMap,
+    weight_map: &WeightMap<f64>,
     rule: &Rule<Item>,
     consequence: Consequence,
 ) {
@@ -173,7 +165,7 @@ fn add_right(
 
 fn add_left(
     queue: &mut BinaryHeap<Consequence>,
-    weight_map: &WeightMap,
+    weight_map: &WeightMap<f64>,
     rule: &Rule<Item>,
     consequence: Consequence,
 ) {
@@ -389,6 +381,24 @@ mod test {
         // W2: 3
         // T: 4
         // ROOT: 5
+        desired_weight_map.set(Consequence {
+            start: 0,
+            item: Item::Terminal(0),
+            end: 1,
+            weight: 1.0,
+        });
+        desired_weight_map.set(Consequence {
+            start: 1,
+            item: Item::Terminal(2),
+            end: 2,
+            weight: 1.0,
+        });
+        desired_weight_map.set(Consequence {
+            start: 2,
+            item: Item::Terminal(4),
+            end: 3,
+            weight: 1.0,
+        });
         desired_weight_map.set(Consequence {
             start: 0,
             item: Item::NonTerminal(1),

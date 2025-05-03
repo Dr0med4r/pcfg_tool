@@ -29,7 +29,9 @@ impl PartialOrd for Consequence {
 
 impl Ord for Consequence {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.weight.partial_cmp(&other.weight).unwrap()
+        self.weight
+            .partial_cmp(&other.weight)
+            .expect("the weights should never be not a number")
         // match self.weight.total_cmp(&other.weight) {
         //     Ordering::Equal => {
         //         let item = self.item.cmp(&other.item);
