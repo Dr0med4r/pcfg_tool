@@ -61,9 +61,12 @@ fn insert_rule_into_map(
         });
     }
     let lhs = Item::NonTerminal(string_map.insert_and_get(rule.lhs) as u64);
-    all_rules.entry(lhs).and_modify(|e| {
-        e.insert(rhs.clone(), rule.weight);
-    }).or_insert(HashMap::from_iter(vec![(rhs.clone(), rule.weight)]));
+    all_rules
+        .entry(lhs)
+        .and_modify(|e| {
+            e.insert(rhs.clone(), rule.weight);
+        })
+        .or_insert(HashMap::from_iter(vec![(rhs.clone(), rule.weight)]));
     for nonterminal in &rhs {
         let set = rhs_grammar.entry(*nonterminal).or_default();
         set.insert(Rule {
@@ -91,12 +94,17 @@ pub fn deduce(
     let mut queue = BinaryHeap::new();
     let sentence_length = line.len();
     for (index, word) in line.iter().enumerate() {
+        for rule in rule_lookup
+            .get(word)
+            .expect("there is no rule that produces the word")
+        {
             queue.push(Consequence {
                 start: index as u64,
-                item: *word,
+                item: rule.lhs,
                 end: (index + 1) as u64,
-                weight: 1.0,
+                weight: rule.weight,
             });
+        }
     }
     let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     while let Some(consequence) = queue.pop() {
@@ -119,6 +127,7 @@ pub fn deduce(
             .expect("there should be a rule with each nonterminal")
         {
             // TODO either alway max two rules or do it correctly
+            // currently max two rules
             add_left(&mut queue, &weight_map, rule, consequence);
             add_right(&mut queue, &weight_map, rule, consequence);
             add_replace(&mut queue, rule, consequence);
@@ -156,7 +165,7 @@ fn add_right(
                     start: next.start,
                     item: rule.lhs,
                     end: consequence.end,
-                    weight: consequence.weight * next.weight * rule.weight,
+                    weight: next.weight * consequence.weight * rule.weight,
                 });
             }
         }
@@ -339,7 +348,10 @@ mod test {
         let desired_rules = HashMap::from_iter(vec![
             (
                 Item::NonTerminal(3),
-                HashMap::from_iter(vec![(vec![Item::NonTerminal(1), Item::NonTerminal(2)], 0.57)]),
+                HashMap::from_iter(vec![(
+                    vec![Item::NonTerminal(1), Item::NonTerminal(2)],
+                    0.57,
+                )]),
             ),
             (
                 Item::NonTerminal(1),
@@ -381,24 +393,6 @@ mod test {
         // W2: 3
         // T: 4
         // ROOT: 5
-        desired_weight_map.set(Consequence {
-            start: 0,
-            item: Item::Terminal(0),
-            end: 1,
-            weight: 1.0,
-        });
-        desired_weight_map.set(Consequence {
-            start: 1,
-            item: Item::Terminal(2),
-            end: 2,
-            weight: 1.0,
-        });
-        desired_weight_map.set(Consequence {
-            start: 2,
-            item: Item::Terminal(4),
-            end: 3,
-            weight: 1.0,
-        });
         desired_weight_map.set(Consequence {
             start: 0,
             item: Item::NonTerminal(1),

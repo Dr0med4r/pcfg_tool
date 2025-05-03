@@ -1,4 +1,7 @@
-use std::cmp::Ordering;
+use std::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+};
 
 use super::weight_map::Item;
 
@@ -8,6 +11,14 @@ pub struct Consequence {
     pub item: Item,
     pub end: u64,
     pub weight: f64,
+}
+
+impl Hash for Consequence {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.start.hash(state);
+        self.item.hash(state);
+        self.end.hash(state);
+    }
 }
 
 impl Eq for Consequence {}
@@ -29,22 +40,22 @@ impl PartialOrd for Consequence {
 
 impl Ord for Consequence {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.weight
-            .partial_cmp(&other.weight)
-            .expect("the weights should never be not a number")
-        // match self.weight.total_cmp(&other.weight) {
-        //     Ordering::Equal => {
-        //         let item = self.item.cmp(&other.item);
-        //         if item != Ordering::Equal {
-        //             return item
-        //         }
-        //         let start = self.start.cmp(&other.start);
-        //         if start != Ordering::Equal {
-        //             return start;
-        //         }
-        //         self.end.cmp(&other.end)
-        //     }
-        //     ord => ord,
-        // }
+        // self.weight
+        //     .partial_cmp(&other.weight)
+        //     .expect("the weights should never be not a number")
+        match self.weight.total_cmp(&other.weight) {
+            Ordering::Equal => {
+                let item = self.item.cmp(&other.item);
+                if item != Ordering::Equal {
+                    return item
+                }
+                let start = self.start.cmp(&other.start);
+                if start != Ordering::Equal {
+                    return start;
+                }
+                self.end.cmp(&other.end)
+            }
+            ord => ord,
+        }
     }
 }

@@ -92,6 +92,7 @@ fn main() {
                         line_items.len() as u64,
                         &string_lookup,
                         &all_rules,
+                        &mut line_items.into(),
                     );
                     println!("{tree}")
                 }
