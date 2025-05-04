@@ -8,3 +8,8 @@ clap = { version = "4.5.35", features = ["derive"] }
 foldhash = "0.1.5"
 indexmap = "2.9.0"
 nom = "8.0.0"
+ordered-float = "2.10.1"
+radix-heap = { version = "0.4.2", features = ["ordered-float"] }
+
+[profile.release]
+debug = true

@@ -92,7 +92,7 @@ pub fn deduce(
     start_item: Item,
     number_of_items: usize,
 ) -> WeightMap<f64> {
-    let mut queue = MaxQueue::with_capacity(4096);
+    let mut queue = MaxQueue::default();
     let sentence_length = line.len();
     for (index, word) in line.iter().enumerate() {
         for rule in rule_lookup
@@ -135,7 +135,6 @@ pub fn deduce(
         }
     }
     eprintln!("len: {}", queue.len());
-    eprintln!("rem len: {}", queue.rem_len());
     weight_map
 }
 
