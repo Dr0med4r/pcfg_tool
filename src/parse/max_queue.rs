@@ -19,11 +19,12 @@ impl PartialOrd for Ordered {
 
 impl Ord for Ordered {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.float.cmp(&other.float) {
-            Ordering::Equal => {}
-            ord => return ord,
-        }
-        self.idx.cmp(&other.idx).reverse()
+        self.float.cmp(&other.float)
+        // match self.float.cmp(&other.float) {
+        //     Ordering::Equal => {}
+        //     ord => return ord,
+        // }
+        // self.idx.cmp(&other.idx).reverse()
     }
 }
 
@@ -44,6 +45,7 @@ struct ConsequenceWithoutWeight {
 pub struct MaxQueue {
     heap: RadixHeapMap<Ordered, ()>,
     data: Vec<ConsequenceWithoutWeight>,
+    free: Vec<usize>,
 }
 
 impl Default for MaxQueue {
@@ -54,6 +56,7 @@ impl Default for MaxQueue {
                 float: NotNan::try_from(1.0).unwrap(),
             }),
             data: Default::default(),
+            free: Default::default(),
         }
     }
 }
@@ -61,6 +64,8 @@ impl Default for MaxQueue {
 impl MaxQueue {
     pub fn pop(&mut self) -> Option<Consequence> {
         self.heap.pop().map(|(weight, _)| {
+            // eprintln!("popping: {:?}", weight);
+            // self.free.push(weight.idx);
             let remaining = &self.data[weight.idx];
             Consequence {
                 start: remaining.start,
@@ -77,8 +82,16 @@ impl MaxQueue {
             item: item.item,
             end: item.end,
         };
-        self.data.push(part);
-        let idx = self.data.len() - 1;
+        let idx = match self.free.pop() {
+            Some(idx) => {
+                self.data[idx] = part;
+                idx
+            }
+            None => {
+                self.data.push(part);
+                self.data.len() - 1
+            }
+        };
         self.heap.push(
             Ordered {
                 idx,
@@ -89,5 +102,8 @@ impl MaxQueue {
     }
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+    pub fn rem_len(&self) -> usize {
+        self.free.len()
     }
 }
