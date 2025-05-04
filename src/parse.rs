@@ -1,10 +1,10 @@
 pub mod consequence;
+mod max_queue;
 pub mod rule;
 pub mod string_lookup;
 pub mod weight_map;
 
 use std::{
-    collections::BinaryHeap,
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
@@ -15,6 +15,7 @@ use crate::parse::rule::Rule;
 use consequence::Consequence;
 use foldhash::HashMap;
 use foldhash::HashSet;
+use max_queue::MaxQueue;
 use string_lookup::StringLookup;
 use weight_map::{Item, WeightMap};
 
@@ -91,7 +92,7 @@ pub fn deduce(
     start_item: Item,
     number_of_items: usize,
 ) -> WeightMap<f64> {
-    let mut queue = BinaryHeap::new();
+    let mut queue = MaxQueue::with_capacity(4096);
     let sentence_length = line.len();
     for (index, word) in line.iter().enumerate() {
         for rule in rule_lookup
@@ -133,10 +134,12 @@ pub fn deduce(
             add_replace(&mut queue, rule, consequence);
         }
     }
+    eprintln!("len: {}", queue.len());
+    eprintln!("rem len: {}", queue.rem_len());
     weight_map
 }
 
-fn add_replace(queue: &mut BinaryHeap<Consequence>, rule: &Rule<Item>, consequence: Consequence) {
+fn add_replace(queue: &mut MaxQueue, rule: &Rule<Item>, consequence: Consequence) {
     // if there is a rule with the item on the right side replace it with the left side
     if rule.rhs.len() == 1 {
         queue.push(Consequence {
@@ -149,7 +152,7 @@ fn add_replace(queue: &mut BinaryHeap<Consequence>, rule: &Rule<Item>, consequen
 }
 
 fn add_right(
-    queue: &mut BinaryHeap<Consequence>,
+    queue: &mut MaxQueue,
     weight_map: &WeightMap<f64>,
     rule: &Rule<Item>,
     consequence: Consequence,
@@ -173,7 +176,7 @@ fn add_right(
 }
 
 fn add_left(
-    queue: &mut BinaryHeap<Consequence>,
+    queue: &mut MaxQueue,
     weight_map: &WeightMap<f64>,
     rule: &Rule<Item>,
     consequence: Consequence,
