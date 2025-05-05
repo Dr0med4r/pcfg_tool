@@ -1,39 +1,7 @@
-use std::cmp::Ordering;
-
 use ordered_float::NotNan;
-use radix_heap::{Radix, RadixHeapMap};
+use radix_heap::RadixHeapMap;
 
 use super::{consequence::Consequence, weight_map::Item};
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct Ordered {
-    idx: usize,
-    float: NotNan<f64>,
-}
-
-impl PartialOrd for Ordered {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Ordered {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.float.cmp(&other.float) {
-            Ordering::Equal => {}
-            ord => return ord,
-        }
-        self.idx.cmp(&other.idx).reverse()
-    }
-}
-
-impl Radix for Ordered {
-    fn radix_similarity(&self, other: &Self) -> u32 {
-        (self.idx, self.float).radix_similarity(&(other.idx, other.float))
-    }
-
-    const RADIX_BITS: u32 = 128u32;
-}
 
 struct ConsequenceWithoutWeight {
     start: u64,
@@ -42,49 +10,57 @@ struct ConsequenceWithoutWeight {
 }
 
 pub struct MaxQueue {
-    heap: RadixHeapMap<Ordered, ()>,
+    heap: RadixHeapMap<NotNan<f64>, usize>,
     data: Vec<ConsequenceWithoutWeight>,
+    free: Vec<usize>,
 }
 
 impl Default for MaxQueue {
     fn default() -> Self {
         Self {
-            heap: RadixHeapMap::new_at(Ordered {
-                idx: 0,
-                float: NotNan::try_from(1.0).unwrap(),
-            }),
+            heap: RadixHeapMap::new_at(NotNan::try_from(1.0).unwrap()),
             data: Default::default(),
+            free: Default::default(),
         }
     }
 }
 
 impl MaxQueue {
     pub fn pop(&mut self) -> Option<Consequence> {
-        self.heap.pop().map(|(weight, _)| {
-            let remaining = &self.data[weight.idx];
-            Consequence {
+        self.heap.pop().map(|(weight, idx)| {
+            let remaining = &self.data[idx];
+            self.free.push(idx);
+            let consequence = Consequence {
                 start: remaining.start,
                 item: remaining.item,
                 end: remaining.end,
-                weight: *weight.float,
-            }
+                weight: *weight,
+            };
+            // eprintln!("popping: {:?}", consequence);
+            consequence
         })
     }
 
     pub fn push(&mut self, item: Consequence) {
+        // eprintln!("pushing: {:?}", item);
         let part = ConsequenceWithoutWeight {
             start: item.start,
             item: item.item,
             end: item.end,
         };
-        self.data.push(part);
-        let idx = self.data.len() - 1;
+        let idx = match self.free.pop() {
+            Some(idx) => {
+                self.data[idx] = part;
+                idx
+            }
+            None => {
+                self.data.push(part);
+                self.data.len() - 1
+            }
+        };
         self.heap.push(
-            Ordered {
-                idx,
-                float: NotNan::try_from(item.weight).expect("should not be NaN"),
-            },
-            (),
+            NotNan::try_from(item.weight).expect("should not be NaN"),
+            idx,
         );
     }
     pub fn len(&self) -> usize {
