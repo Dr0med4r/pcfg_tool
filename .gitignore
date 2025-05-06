@@ -1,6 +1,9 @@
 /target
 /training
 /test
+/tests
+tests.mk
+TESTS.org
 pcfg_tool
 /.direnv
 *.words

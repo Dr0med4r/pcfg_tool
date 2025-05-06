@@ -44,7 +44,22 @@ pub enum Commands {
     },
     Binarise {},
     Debinarise {},
-    Unk {},
-    Smooth {},
-    Outside {},
+    Unk {
+        #[arg(short, long)]
+        threshold: Option<u64>,
+    },
+    Smooth {
+        #[arg(short, long)]
+        threshold: Option<u64>,
+    },
+    Outside {
+        #[arg(value_name = "RULES")]
+        rules: PathBuf,
+        #[arg(value_name = "LEXICON")]
+        lexicon: PathBuf,
+        #[arg()]
+        grammar: Option<String>,
+        #[arg(short, long, default_value_t=String::from("ROOT"))]
+        initial_nonterminal: String,
+    },
 }
