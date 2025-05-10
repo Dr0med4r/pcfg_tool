@@ -7,9 +7,9 @@ use super::weight_map::Item;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Consequence {
-    pub start: u64,
+    pub start: u32,
     pub item: Item,
-    pub end: u64,
+    pub end: u32,
     pub weight: f64,
 }
 

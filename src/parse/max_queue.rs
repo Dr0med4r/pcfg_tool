@@ -4,9 +4,9 @@ use radix_heap::RadixHeapMap;
 use super::{consequence::Consequence, weight_map::Item};
 
 struct ConsequenceWithoutWeight {
-    start: u64,
+    start: u32,
     item: Item,
-    end: u64,
+    end: u32,
 }
 
 pub struct MaxQueue {

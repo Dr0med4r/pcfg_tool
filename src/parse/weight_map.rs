@@ -8,11 +8,11 @@ use super::{consequence::Consequence, string_lookup::StringLookup};
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Clone, Copy)]
 pub enum Item {
-    NonTerminal(u64),
-    Terminal(u64),
+    NonTerminal(u32),
+    Terminal(u32),
 }
 
-impl From<Item> for u64 {
+impl From<Item> for u32 {
     fn from(val: Item) -> Self {
         match val {
             Item::NonTerminal(u) => u,
@@ -29,21 +29,25 @@ impl From<Item> for usize {
     }
 }
 
-fn triangle_index(triangle_length: u64, triangle: u64, i: u64, j: u64) -> usize {
-    ((triangle * WeightMap::elements(triangle_length))
-        + WeightMap::elements(triangle_length - i - 1)
+fn triangle_index(triangle_length: u32, triangle: u32, i: u32, j: u32) -> usize {
+    ((triangle * elements(triangle_length))
+        + elements(triangle_length - i - 1)
         + (triangle_length - j)) as usize
+}
+
+fn elements(len: u32) -> u32 {
+    (len * (len + 1)) / 2
 }
 
 pub struct WeightMapIterator<'a> {
     data: &'a Vec<f64>,
-    sentence_length: u64,
+    sentence_length: u32,
     /// the item over which to iterate
     item: Item,
     /// the fixed position of the value
-    fixed: u64,
-    /// the start position of the value
-    pos: u64,
+    fixed: u32,
+    /// the moving position of the value
+    pos: u32,
     /// if the fixed position is the end or the start
     start: bool,
 }
@@ -64,14 +68,14 @@ impl Iterator for WeightMapIterator<'_> {
             let index = if self.start {
                 triangle_index(
                     self.sentence_length,
-                    u64::from(self.item),
+                    u32::from(self.item),
                     self.fixed,
                     self.pos,
                 )
             } else {
                 triangle_index(
                     self.sentence_length,
-                    u64::from(self.item),
+                    u32::from(self.item),
                     self.pos,
                     self.fixed,
                 )
@@ -102,19 +106,15 @@ impl Iterator for WeightMapIterator<'_> {
 #[derive(Debug, PartialEq)]
 pub struct WeightMap<T> {
     data: Vec<T>,
-    sentence_length: u64,
+    sentence_length: u32,
 }
 
 impl WeightMap<f64> {
-    fn elements(len: u64) -> u64 {
-        (len * (len + 1)) / 2
-    }
-
     fn index(&self, consequence: &Consequence) -> usize {
         // n: max_len index(a,b) = size(n-a-1) + n-b
         triangle_index(
             self.sentence_length,
-            u64::from(consequence.item),
+            u32::from(consequence.item),
             consequence.start,
             consequence.end,
         )
@@ -127,20 +127,20 @@ impl WeightMap<f64> {
         self.data[self.index(consequence)]
     }
 
-    pub fn get_with_index(&self, item: Item, start: u64, end: u64) -> f64 {
+    pub fn get_with_index(&self, item: Item, start: u32, end: u32) -> f64 {
         assert!(start < end);
         assert!(end <= self.sentence_length);
         assert!(start < self.sentence_length);
-        self.data[triangle_index(self.sentence_length, u64::from(item), start, end)]
+        self.data[triangle_index(self.sentence_length, u32::from(item), start, end)]
     }
 
     pub fn with_capacity(items: usize, sentence_length: usize) -> Self {
-        let length = items * WeightMap::elements(sentence_length as u64) as usize;
+        let length = items * elements(sentence_length as u32) as usize;
         let mut data = Vec::with_capacity(length);
         data.resize(length, 0.0);
         WeightMap {
             data,
-            sentence_length: sentence_length as u64,
+            sentence_length: sentence_length as u32,
         }
     }
 
@@ -149,7 +149,7 @@ impl WeightMap<f64> {
         self.data[index] = consequence.weight
     }
 
-    pub fn get_starts_at(&self, item: Item, start: u64) -> impl Iterator<Item = Consequence> {
+    pub fn get_starts_at(&self, item: Item, start: u32) -> impl Iterator<Item = Consequence> {
         WeightMapIterator {
             sentence_length: self.sentence_length,
             data: &self.data,
@@ -160,7 +160,7 @@ impl WeightMap<f64> {
         }
     }
 
-    pub fn get_ends_at(&self, item: Item, end: u64) -> impl Iterator<Item = Consequence> {
+    pub fn get_ends_at(&self, item: Item, end: u32) -> impl Iterator<Item = Consequence> {
         WeightMapIterator {
             sentence_length: self.sentence_length,
             data: &self.data,
@@ -174,8 +174,8 @@ impl WeightMap<f64> {
     pub fn convert_to_parse_tree(
         &self,
         initial: Item,
-        start: u64,
-        end: u64,
+        start: u32,
+        end: u32,
         string_lookup: &StringLookup,
         all_rules: &HashMap<Item, HashMap<Vec<Item>, f64>>,
         line: &mut VecDeque<Item>,
@@ -271,8 +271,8 @@ mod test {
 
     #[test]
     fn weightmap_test() {
-        const RULES: u64 = 4;
-        const SENTENCE: u64 = 4;
+        const RULES: u32 = 4;
+        const SENTENCE: u32 = 4;
         let mut weight_map = WeightMap::with_capacity(RULES as usize, SENTENCE as usize);
         for rule in 0..RULES {
             for x in 0..SENTENCE {
@@ -303,8 +303,8 @@ mod test {
 
     #[test]
     fn weightmap_starts_at_test() {
-        const RULES: u64 = 4;
-        const SENTENCE: u64 = 4;
+        const RULES: u32 = 4;
+        const SENTENCE: u32 = 4;
         let mut weight_map = WeightMap::with_capacity(RULES as usize, SENTENCE as usize);
         let consequence1 = Consequence {
             start: 0,
@@ -336,8 +336,8 @@ mod test {
 
     #[test]
     fn weightmap_ends_at_test() {
-        const RULES: u64 = 4;
-        const SENTENCE: u64 = 4;
+        const RULES: u32 = 4;
+        const SENTENCE: u32 = 4;
         let mut weight_map = WeightMap::with_capacity(RULES as usize, SENTENCE as usize);
         let consequence1 = Consequence {
             start: 0,
@@ -388,7 +388,7 @@ mod test {
         for line in rules {
             insert_rule_into_map(&mut string_map, true, &mut grammar, &mut all_rules, line);
         }
-        let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u64);
+        let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
 
         let line = transform_sentence("T S", &string_map);
@@ -396,7 +396,7 @@ mod test {
         let tree = weight_map.convert_to_parse_tree(
             initial,
             0,
-            line.len() as u64,
+            line.len() as u32,
             &string_map,
             &all_rules,
             &mut line.into(),
@@ -445,14 +445,14 @@ mod test {
         for line in rules {
             insert_rule_into_map(&mut string_map, true, &mut grammar, &mut all_rules, line);
         }
-        let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u64);
+        let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
         let line = transform_sentence("R S T", &string_map);
         let weight_map = deduce(&line, &grammar, initial, string_map.len());
         weight_map.convert_to_parse_tree(
             initial,
             0,
-            line.len() as u64,
+            line.len() as u32,
             &string_map,
             &all_rules,
             &mut line.into(),

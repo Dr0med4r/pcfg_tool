@@ -54,14 +54,14 @@ fn insert_rule_into_map(
     };
     let mut rhs = Vec::new();
     for nonterminal in rule.rhs {
-        let item = string_map.insert_and_get(nonterminal) as u64;
+        let item = string_map.insert_and_get(nonterminal) as u32;
         rhs.push(if is_rule {
             Item::NonTerminal(item)
         } else {
             Item::Terminal(item)
         });
     }
-    let lhs = Item::NonTerminal(string_map.insert_and_get(rule.lhs) as u64);
+    let lhs = Item::NonTerminal(string_map.insert_and_get(rule.lhs) as u32);
     all_rules
         .entry(lhs)
         .and_modify(|e| {
@@ -81,7 +81,7 @@ fn insert_rule_into_map(
 pub fn transform_sentence(line: &str, lexicon: &StringLookup) -> Vec<Item> {
     line.split_whitespace()
         .map(|word| {
-            Item::Terminal(lexicon.get(word).expect("this word is not in the lexicon") as u64)
+            Item::Terminal(lexicon.get(word).expect("this word is not in the lexicon") as u32)
         })
         .collect()
 }
@@ -100,9 +100,9 @@ pub fn deduce(
             .expect("there is no rule that produces the word")
         {
             queue.push(Consequence {
-                start: index as u64,
+                start: index as u32,
                 item: rule.lhs,
-                end: (index + 1) as u64,
+                end: (index + 1) as u32,
                 weight: rule.weight,
             });
         }
@@ -116,7 +116,7 @@ pub fn deduce(
         if weight_map.get_consequence(&Consequence {
             start: 0,
             item: start_item,
-            end: sentence_length as u64,
+            end: sentence_length as u32,
             weight: 0.0,
         }) != 0.0
         {
@@ -129,16 +129,16 @@ pub fn deduce(
         {
             // TODO either alway max two rules or do it correctly
             // currently max two rules
-            add_left(&mut queue, &weight_map, rule, consequence);
-            add_right(&mut queue, &weight_map, rule, consequence);
-            add_replace(&mut queue, rule, consequence);
+            add_left(&mut queue, &weight_map, rule, &consequence);
+            add_right(&mut queue, &weight_map, rule, &consequence);
+            add_replace(&mut queue, rule, &consequence);
         }
     }
     eprintln!("len: {}", queue.len());
     weight_map
 }
 
-fn add_replace(queue: &mut MaxQueue, rule: &Rule<Item>, consequence: Consequence) {
+fn add_replace(queue: &mut MaxQueue, rule: &Rule<Item>, consequence: &Consequence) {
     // if there is a rule with the item on the right side replace it with the left side
     if rule.rhs.len() == 1 {
         queue.push(Consequence {
@@ -154,7 +154,7 @@ fn add_right(
     queue: &mut MaxQueue,
     weight_map: &WeightMap<f64>,
     rule: &Rule<Item>,
-    consequence: Consequence,
+    consequence: &Consequence,
 ) {
     // if there is a rule with the item last
     // add all consequences to the queue where the sequence of items is in the weight map
@@ -178,7 +178,7 @@ fn add_left(
     queue: &mut MaxQueue,
     weight_map: &WeightMap<f64>,
     rule: &Rule<Item>,
-    consequence: Consequence,
+    consequence: &Consequence,
 ) {
     // if there is a rule with the item first
     // add all consequences to the queue where the sequence of items is in the weight map
@@ -384,7 +384,7 @@ mod test {
         for line in rules {
             insert_rule_into_map(&mut string_map, true, &mut grammar, &mut all_rules, line);
         }
-        let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u64);
+        let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
 
         let line = transform_sentence("R S T", &string_map);

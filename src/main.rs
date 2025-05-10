@@ -72,7 +72,7 @@ fn main() {
                     string_lookup
                         .get(initial_nonterminal)
                         .expect("initial nonterminal is not in the rules")
-                        as u64,
+                        as u32,
                 );
                 rule_lookup.entry(initial_nonterminal).or_default();
                 let rule_weights = deduce(
@@ -81,7 +81,7 @@ fn main() {
                     initial_nonterminal,
                     string_lookup.len(),
                 );
-                if rule_weights.get_with_index(initial_nonterminal, 0, line_items.len() as u64)
+                if rule_weights.get_with_index(initial_nonterminal, 0, line_items.len() as u32)
                     == 0.0
                 {
                     println!("(NOPARSE {})", line)
@@ -89,7 +89,7 @@ fn main() {
                     let tree = rule_weights.convert_to_parse_tree(
                         initial_nonterminal,
                         0,
-                        line_items.len() as u64,
+                        line_items.len() as u32,
                         &string_lookup,
                         &all_rules,
                         &mut line_items.into(),
