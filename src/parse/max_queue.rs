@@ -30,14 +30,12 @@ impl MaxQueue {
         self.heap.pop().map(|(weight, idx)| {
             let remaining = &self.data[idx];
             self.free.push(idx);
-            let consequence = Consequence {
+            Consequence {
                 start: remaining.start,
                 item: remaining.item,
                 end: remaining.end,
                 weight: *weight,
-            };
-            // eprintln!("popping: {:?}", consequence);
-            consequence
+            }
         })
     }
 

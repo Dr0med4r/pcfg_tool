@@ -110,7 +110,7 @@ impl WeightMap<f64> {
         (len * (len + 1)) / 2
     }
 
-    fn index(&self, consequence: Consequence) -> usize {
+    fn index(&self, consequence: &Consequence) -> usize {
         // n: max_len index(a,b) = size(n-a-1) + n-b
         triangle_index(
             self.sentence_length,
@@ -120,7 +120,7 @@ impl WeightMap<f64> {
         )
     }
 
-    pub fn get_consequence(&self, consequence: Consequence) -> f64 {
+    pub fn get_consequence(&self, consequence: &Consequence) -> f64 {
         assert!(consequence.start < consequence.end);
         assert!(consequence.end <= self.sentence_length);
         assert!(consequence.start < self.sentence_length);
@@ -145,7 +145,7 @@ impl WeightMap<f64> {
     }
 
     pub fn set(&mut self, consequence: Consequence) {
-        let index = self.index(consequence);
+        let index = self.index(&consequence);
         self.data[index] = consequence.weight
     }
 
@@ -289,7 +289,7 @@ mod test {
         for rule in 0..RULES {
             for x in 0..SENTENCE {
                 for y in x + 1..=SENTENCE {
-                    let value = weight_map.get_consequence(Consequence {
+                    let value = weight_map.get_consequence(&Consequence {
                         start: x,
                         item: Item::NonTerminal(rule),
                         end: y,

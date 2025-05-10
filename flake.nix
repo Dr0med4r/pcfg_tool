@@ -28,7 +28,7 @@
           extensions = ["rust-analyzer" "rust-src"];
         };
 
-        nativeBuildInputs = with pkgs; [cargo-flamegraph openssl cmake rustToolchain pkg-config];
+        nativeBuildInputs = with pkgs; [cargo-flamegraph rustToolchain valgrind];
       in
         with pkgs; {
           devShells.default = mkShell {
