@@ -12,10 +12,16 @@ use std::hash::Hash;
 
 use crate::induce::parse_tree::atom;
 
+#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum Rhs<T> {
+    Unary(T),
+    Binary(T, T),
+}
+
 #[derive(Debug)]
 pub struct Rule<T> {
     pub lhs: T,
-    pub rhs: Vec<T>,
+    pub rhs: Rhs<T>,
     pub weight: f64,
 }
 
@@ -44,7 +50,7 @@ impl Rule<String> {
                 exit(1)
             })
         };
-        let (_, (lhs, _, _, (rhs, weight))) = match (
+        let (_, (lhs, _, _, (mut rhs, weight))) = match (
             map(atom, to_string),
             char('-'),
             char('>'),
@@ -60,6 +66,21 @@ impl Rule<String> {
                 eprintln!("parsing rule \"{input}\": {e}");
                 exit(1);
             }
+        };
+        let last = rhs.pop();
+        let first = rhs.pop();
+        let rhs = if first.is_some() {
+            let (Some(item1), Some(item2)) = (first, last) else {
+                panic!()
+            };
+            Rhs::Binary(item1, item2)
+        } else if last.is_some() {
+            let Some(item) = last else { panic!() };
+            Rhs::Unary(item)
+        } else {
+            panic!();
+            eprintln!("expecting binary rules");
+            exit(1);
         };
         Rule { lhs, rhs, weight }
     }
@@ -87,7 +108,7 @@ impl Rule<String> {
         };
         Rule {
             lhs,
-            rhs: vec![rhs],
+            rhs: Rhs::Unary(rhs),
             weight,
         }
     }

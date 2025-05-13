@@ -4,7 +4,7 @@ use foldhash::HashMap;
 
 use crate::induce::parse_tree::ParseTree;
 
-use super::{consequence::Consequence, string_lookup::StringLookup};
+use super::{consequence::Consequence, rule::Rhs, string_lookup::StringLookup};
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Clone, Copy)]
 pub enum Item {
@@ -177,7 +177,7 @@ impl WeightMap<f64> {
         start: u32,
         end: u32,
         string_lookup: &StringLookup,
-        all_rules: &HashMap<Item, HashMap<Vec<Item>, f64>>,
+        all_rules: &HashMap<Item, HashMap<Rhs<Item>, f64>>,
         line: &mut VecDeque<Item>,
     ) -> ParseTree<String> {
         let root = string_lookup
@@ -187,62 +187,65 @@ impl WeightMap<f64> {
         let mut children = Vec::new();
         // check all rules if it is the rule applied
         'rule: for (rhs, weight_of_rule) in all_rules.get(&initial).unwrap() {
-            if rhs.len() == 1 {
-                let rhs = rhs[0];
-                let weight_of_lhs = self.get_with_index(initial, start, end);
-                match rhs {
-                    Item::NonTerminal(_) => {
-                        let weight_of_rhs = self.get_with_index(rhs, start, end);
-                        if weight_of_rhs * weight_of_rule == weight_of_lhs {
-                            let child = self.convert_to_parse_tree(
-                                rhs,
+            match rhs {
+                Rhs::Unary(rhs) => {
+                    let weight_of_lhs = self.get_with_index(initial, start, end);
+                    match rhs {
+                        Item::NonTerminal(_) => {
+                            let weight_of_rhs = self.get_with_index(*rhs, start, end);
+                            if weight_of_rhs * weight_of_rule == weight_of_lhs {
+                                let child = self.convert_to_parse_tree(
+                                    *rhs,
+                                    start,
+                                    end,
+                                    string_lookup,
+                                    all_rules,
+                                    line,
+                                );
+                                children.push(child);
+                                break;
+                            }
+                        }
+                        Item::Terminal(_) => {
+                            if *weight_of_rule == weight_of_lhs {
+                                let child = ParseTree {
+                                    root: string_lookup
+                                        .get_string(usize::from(line.pop_front().unwrap()))
+                                        .unwrap()
+                                        .clone(),
+                                    children: vec![],
+                                };
+                                children.push(child);
+                                break;
+                            }
+                        }
+                    }
+                    continue;
+                }
+                Rhs::Binary(item1, item2) => {
+                    for partition in start + 1..end {
+                        let l = self.get_with_index(*item1, start, partition);
+                        let r = self.get_with_index(*item2, partition, end);
+                        if l * r * weight_of_rule == self.get_with_index(initial, start, end) {
+                            children.push(self.convert_to_parse_tree(
+                                *item1,
                                 start,
+                                partition,
+                                string_lookup,
+                                all_rules,
+                                line,
+                            ));
+                            children.push(self.convert_to_parse_tree(
+                                *item2,
+                                partition,
                                 end,
                                 string_lookup,
                                 all_rules,
                                 line,
-                            );
-                            children.push(child);
-                            break;
+                            ));
+                            break 'rule;
                         }
                     }
-                    Item::Terminal(_) => {
-                        if *weight_of_rule == weight_of_lhs {
-                            let child = ParseTree {
-                                root: string_lookup
-                                    .get_string(usize::from(line.pop_front().unwrap()))
-                                    .unwrap()
-                                    .clone(),
-                                children: vec![],
-                            };
-                            children.push(child);
-                            break;
-                        }
-                    }
-                }
-                continue;
-            }
-            for partition in start + 1..end {
-                let l = self.get_with_index(rhs[0], start, partition);
-                let r = self.get_with_index(rhs[1], partition, end);
-                if l * r * weight_of_rule == self.get_with_index(initial, start, end) {
-                    children.push(self.convert_to_parse_tree(
-                        rhs[0],
-                        start,
-                        partition,
-                        string_lookup,
-                        all_rules,
-                        line,
-                    ));
-                    children.push(self.convert_to_parse_tree(
-                        rhs[1],
-                        partition,
-                        end,
-                        string_lookup,
-                        all_rules,
-                        line,
-                    ));
-                    break 'rule;
                 }
             }
         }

@@ -16,6 +16,7 @@ use consequence::Consequence;
 use foldhash::HashMap;
 use foldhash::HashSet;
 use max_queue::MaxQueue;
+use rule::Rhs;
 use string_lookup::StringLookup;
 use weight_map::{Item, WeightMap};
 
@@ -23,7 +24,7 @@ use weight_map::{Item, WeightMap};
 pub fn parse_rules(
     string_map: &mut StringLookup,
     rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
-    all_rules: &mut HashMap<Item, HashMap<Vec<Item>, f64>>,
+    all_rules: &mut HashMap<Item, HashMap<Rhs<Item>, f64>>,
     path: &Path,
     is_rule: bool,
 ) {
@@ -44,7 +45,7 @@ fn insert_rule_into_map(
     string_map: &mut StringLookup,
     is_rule: bool,
     rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
-    all_rules: &mut HashMap<Item, HashMap<Vec<Item>, f64>>,
+    all_rules: &mut HashMap<Item, HashMap<Rhs<Item>, f64>>,
     line: String,
 ) {
     let rule = if is_rule {
@@ -52,30 +53,52 @@ fn insert_rule_into_map(
     } else {
         Rule::from_lexicon(&line)
     };
-    let mut rhs = Vec::new();
-    for nonterminal in rule.rhs {
-        let item = string_map.insert_and_get(nonterminal) as u32;
-        rhs.push(if is_rule {
-            Item::NonTerminal(item)
-        } else {
-            Item::Terminal(item)
-        });
-    }
+    let rhs = match rule.rhs {
+        Rhs::Unary(item) => {
+            let item = string_map.insert_and_get(item) as u32;
+            Rhs::Unary(if is_rule {
+                Item::NonTerminal(item)
+            } else {
+                Item::Terminal(item)
+            })
+        }
+        Rhs::Binary(item1, item2) => {
+            let item1 = string_map.insert_and_get(item1) as u32;
+            let item2 = string_map.insert_and_get(item2) as u32;
+            Rhs::Binary(Item::NonTerminal(item1), Item::NonTerminal(item2))
+        }
+    };
     let lhs = Item::NonTerminal(string_map.insert_and_get(rule.lhs) as u32);
     all_rules
         .entry(lhs)
         .and_modify(|e| {
-            e.insert(rhs.clone(), rule.weight);
+            e.insert(rhs, rule.weight);
         })
-        .or_insert(HashMap::from_iter(vec![(rhs.clone(), rule.weight)]));
-    for nonterminal in &rhs {
-        let set = rhs_grammar.entry(*nonterminal).or_default();
-        set.insert(Rule {
-            lhs,
-            rhs: rhs.clone(),
-            weight: rule.weight,
-        });
+        .or_insert(HashMap::from_iter(vec![(rhs, rule.weight)]));
+    match &rhs {
+        Rhs::Unary(item) => {
+            insert_rule(rhs_grammar, rule.weight, &rhs, lhs, item);
+        }
+        Rhs::Binary(item1, item2) => {
+            insert_rule(rhs_grammar, rule.weight, &rhs, lhs, item1);
+            insert_rule(rhs_grammar, rule.weight, &rhs, lhs, item2);
+        }
     }
+}
+
+fn insert_rule(
+    rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
+    weight: f64,
+    rhs: &Rhs<Item>,
+    lhs: Item,
+    item: &Item,
+) {
+    let set = rhs_grammar.entry(*item).or_default();
+    set.insert(Rule {
+        lhs,
+        rhs: *rhs,
+        weight,
+    });
 }
 
 pub fn transform_sentence(line: &str, lexicon: &StringLookup) -> Vec<Item> {
@@ -113,12 +136,9 @@ pub fn deduce(
             continue;
         }
         weight_map.set(consequence);
-        if weight_map.get_consequence(&Consequence {
-            start: 0,
-            item: start_item,
-            end: sentence_length as u32,
-            weight: 0.0,
-        }) != 0.0
+        if consequence.start == 0
+            && consequence.end == sentence_length as u32
+            && consequence.item == start_item
         {
             break;
         }
@@ -127,11 +147,15 @@ pub fn deduce(
             .get(&consequence.item)
             .expect("there should be a rule with each nonterminal")
         {
-            // TODO either alway max two rules or do it correctly
-            // currently max two rules
-            add_left(&mut queue, &weight_map, rule, &consequence);
-            add_right(&mut queue, &weight_map, rule, &consequence);
-            add_replace(&mut queue, rule, &consequence);
+            match rule.rhs {
+                Rhs::Unary(_) => {
+                    add_replace(&mut queue, rule, &consequence);
+                }
+                Rhs::Binary(item1, item2) => {
+                    add_left(&mut queue, &weight_map, rule, (item1, item2), &consequence);
+                    add_right(&mut queue, &weight_map, rule, (item1, item2), &consequence);
+                }
+            }
         }
     }
     eprintln!("len: {}", queue.len());
@@ -140,36 +164,34 @@ pub fn deduce(
 
 fn add_replace(queue: &mut MaxQueue, rule: &Rule<Item>, consequence: &Consequence) {
     // if there is a rule with the item on the right side replace it with the left side
-    if rule.rhs.len() == 1 {
-        queue.push(Consequence {
-            start: consequence.start,
-            item: rule.lhs,
-            end: consequence.end,
-            weight: consequence.weight * rule.weight,
-        })
-    }
+    queue.push(Consequence {
+        start: consequence.start,
+        item: rule.lhs,
+        end: consequence.end,
+        weight: consequence.weight * rule.weight,
+    })
 }
 
 fn add_right(
     queue: &mut MaxQueue,
     weight_map: &WeightMap<f64>,
     rule: &Rule<Item>,
+    rhs: (Item, Item),
     consequence: &Consequence,
 ) {
     // if there is a rule with the item last
     // add all consequences to the queue where the sequence of items is in the weight map
     // such that item1.end == item2.start, item2.end == item3.start ...
     // then Consequence {start: item1.start, item: lhs, end: itemn.end } is added
-    if consequence.item == rule.rhs[rule.rhs.len() - 1] {
-        for item in rule.rhs[..rule.rhs.len() - 1].iter().rev() {
-            for next in weight_map.get_ends_at(*item, consequence.start) {
-                queue.push(Consequence {
-                    start: next.start,
-                    item: rule.lhs,
-                    end: consequence.end,
-                    weight: next.weight * consequence.weight * rule.weight,
-                });
-            }
+    if consequence.item == rhs.1 {
+        for next in weight_map.get_ends_at(rhs.0, consequence.start) {
+            queue.push(Consequence {
+                start: next.start,
+                item: rule.lhs,
+                end: consequence.end,
+                // always multiply left with right to preserve same value
+                weight: next.weight * consequence.weight * rule.weight,
+            });
         }
     }
 }
@@ -178,22 +200,22 @@ fn add_left(
     queue: &mut MaxQueue,
     weight_map: &WeightMap<f64>,
     rule: &Rule<Item>,
+    rhs: (Item, Item),
     consequence: &Consequence,
 ) {
     // if there is a rule with the item first
     // add all consequences to the queue where the sequence of items is in the weight map
     // such that item1.end == item2.start, item2.end == item3.start ...
     // then Consequence {start: item1.start, item: lhs, end: itemn.end } is added
-    if consequence.item == rule.rhs[0] {
-        for item in &rule.rhs[1..] {
-            for next in weight_map.get_starts_at(*item, consequence.end) {
-                queue.push(Consequence {
-                    start: consequence.start,
-                    item: rule.lhs,
-                    end: next.end,
-                    weight: consequence.weight * next.weight * rule.weight,
-                });
-            }
+    if consequence.item == rhs.0 {
+        for next in weight_map.get_starts_at(rhs.1, consequence.end) {
+            queue.push(Consequence {
+                start: consequence.start,
+                item: rule.lhs,
+                end: next.end,
+                // always multiply left with right to preserve same value
+                weight: consequence.weight * next.weight * rule.weight,
+            });
         }
     }
 }
@@ -210,17 +232,17 @@ mod test {
         assert_eq!(
             Rule {
                 lhs: "A".to_string(),
-                rhs: vec!["B".to_string()],
+                rhs: Rhs::Unary("B".to_string()),
                 weight: 0.5
             },
             rule
         );
-        let rule = " ROOT -> B C D 0.57   ";
+        let rule = " ROOT -> B C 0.57   ";
         let rule = Rule::from_rule(rule);
         assert_eq!(
             Rule {
                 lhs: "ROOT".to_string(),
-                rhs: vec!["B".to_string(), "C".to_string(), "D".to_string()],
+                rhs: Rhs::Binary("B".to_string(), "C".to_string()),
                 weight: 0.57
             },
             rule
@@ -249,7 +271,7 @@ mod test {
                 Item::NonTerminal(0),
                 HashSet::from_iter(vec![Rule {
                     lhs: Item::NonTerminal(2),
-                    rhs: vec![Item::NonTerminal(0), Item::NonTerminal(1)],
+                    rhs: Rhs::Binary(Item::NonTerminal(0), Item::NonTerminal(1)),
                     weight: 0.57,
                 }]),
             ),
@@ -257,7 +279,7 @@ mod test {
                 Item::NonTerminal(1),
                 HashSet::from_iter(vec![Rule {
                     lhs: Item::NonTerminal(2),
-                    rhs: vec![Item::NonTerminal(0), Item::NonTerminal(1)],
+                    rhs: Rhs::Binary(Item::NonTerminal(0), Item::NonTerminal(1)),
                     weight: 0.57,
                 }]),
             ),
@@ -285,7 +307,7 @@ mod test {
             Item::Terminal(0),
             HashSet::from_iter(vec![Rule {
                 lhs: Item::NonTerminal(1),
-                rhs: vec![Item::Terminal(0)],
+                rhs: Rhs::Unary(Item::Terminal(0)),
                 weight: 0.57,
             }]),
         )]);
@@ -325,7 +347,7 @@ mod test {
                 Item::NonTerminal(1),
                 HashSet::from_iter(vec![Rule {
                     lhs: Item::NonTerminal(3),
-                    rhs: vec![Item::NonTerminal(1), Item::NonTerminal(2)],
+                    rhs: Rhs::Binary(Item::NonTerminal(1), Item::NonTerminal(2)),
                     weight: 0.57,
                 }]),
             ),
@@ -333,7 +355,7 @@ mod test {
                 Item::NonTerminal(2),
                 HashSet::from_iter(vec![Rule {
                     lhs: Item::NonTerminal(3),
-                    rhs: vec![Item::NonTerminal(1), Item::NonTerminal(2)],
+                    rhs: Rhs::Binary(Item::NonTerminal(1), Item::NonTerminal(2)),
                     weight: 0.57,
                 }]),
             ),
@@ -341,7 +363,7 @@ mod test {
                 Item::Terminal(0),
                 HashSet::from_iter(vec![Rule {
                     lhs: Item::NonTerminal(1),
-                    rhs: vec![Item::Terminal(0)],
+                    rhs: Rhs::Unary(Item::Terminal(0)),
                     weight: 0.57,
                 }]),
             ),
@@ -351,13 +373,13 @@ mod test {
             (
                 Item::NonTerminal(3),
                 HashMap::from_iter(vec![(
-                    vec![Item::NonTerminal(1), Item::NonTerminal(2)],
+                    Rhs::Binary(Item::NonTerminal(1), Item::NonTerminal(2)),
                     0.57,
                 )]),
             ),
             (
                 Item::NonTerminal(1),
-                HashMap::from_iter(vec![(vec![Item::Terminal(0)], 0.57)]),
+                HashMap::from_iter(vec![(Rhs::Unary(Item::Terminal(0)), 0.57)]),
             ),
         ]);
         assert_eq!(desired_rules, all_rules);
