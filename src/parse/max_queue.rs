@@ -40,7 +40,6 @@ impl MaxQueue {
     }
 
     pub fn push(&mut self, item: Consequence) {
-        // eprintln!("pushing: {:?}", item);
         let part = ConsequenceWithoutWeight {
             start: item.start,
             item: item.item,
@@ -60,8 +59,5 @@ impl MaxQueue {
             NotNan::try_from(item.weight).expect("should not be NaN"),
             idx,
         );
-    }
-    pub fn len(&self) -> usize {
-        self.data.len()
     }
 }

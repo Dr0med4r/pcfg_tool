@@ -154,7 +154,6 @@ pub fn deduce(
             }
         }
     }
-    eprintln!("len: {}", queue.len());
     weight_map
 }
 
