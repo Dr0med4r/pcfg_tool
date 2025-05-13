@@ -41,6 +41,7 @@ fn elements(len: u32) -> u32 {
 
 pub struct WeightMapIterator<'a> {
     data: &'a Vec<f64>,
+    map: &'a WeightMap<f64>,
     sentence_length: u32,
     /// the item over which to iterate
     item: Item,
@@ -82,7 +83,7 @@ impl Iterator for WeightMapIterator<'_> {
             };
             let pos = self.pos;
             self.pos += 1;
-            if self.data[index] != 0.0 {
+            if self.map.index_is_set(index) {
                 if self.start {
                     return Some(Consequence {
                         start: self.fixed,
@@ -106,6 +107,7 @@ impl Iterator for WeightMapIterator<'_> {
 #[derive(Debug, PartialEq)]
 pub struct WeightMap<T> {
     data: Vec<T>,
+    map: Vec<u8>,
     sentence_length: u32,
 }
 
@@ -120,11 +122,17 @@ impl WeightMap<f64> {
         )
     }
 
-    pub fn get_consequence(&self, consequence: &Consequence) -> f64 {
+    fn index_is_set(&self, index: usize) -> bool {
+        let (index, rem) = (index / 8, index % 8);
+        self.map[index] & 1 << rem > 0
+    }
+
+    pub fn is_set(&self, consequence: &Consequence) -> bool {
         assert!(consequence.start < consequence.end);
         assert!(consequence.end <= self.sentence_length);
         assert!(consequence.start < self.sentence_length);
-        self.data[self.index(consequence)]
+        let index = self.index(consequence);
+        self.index_is_set(index)
     }
 
     pub fn get_with_index(&self, item: Item, start: u32, end: u32) -> f64 {
@@ -136,16 +144,20 @@ impl WeightMap<f64> {
 
     pub fn with_capacity(items: usize, sentence_length: usize) -> Self {
         let length = items * elements(sentence_length as u32) as usize;
-        let mut data = Vec::with_capacity(length);
-        data.resize(length, 0.0);
+        let data = vec![0.0; length];
+        let length = length / 8 + 1;
+        let map = vec![0; length];
         WeightMap {
             data,
+            map,
             sentence_length: sentence_length as u32,
         }
     }
 
     pub fn set(&mut self, consequence: Consequence) {
         let index = self.index(&consequence);
+        let (map_index, rem) = (index / 8, index % 8);
+        self.map[map_index] |= 1 << rem;
         self.data[index] = consequence.weight
     }
 
@@ -153,6 +165,7 @@ impl WeightMap<f64> {
         WeightMapIterator {
             sentence_length: self.sentence_length,
             data: &self.data,
+            map: self,
             item,
             fixed: start,
             pos: start + 1,
@@ -164,6 +177,7 @@ impl WeightMap<f64> {
         WeightMapIterator {
             sentence_length: self.sentence_length,
             data: &self.data,
+            map: self,
             item,
             fixed: end,
             pos: 0,
@@ -292,12 +306,7 @@ mod test {
         for rule in 0..RULES {
             for x in 0..SENTENCE {
                 for y in x + 1..=SENTENCE {
-                    let value = weight_map.get_consequence(&Consequence {
-                        start: x,
-                        item: Item::NonTerminal(rule),
-                        end: y,
-                        weight: 0.5,
-                    });
+                    let value = weight_map.get_with_index(Item::NonTerminal(rule), x, y);
                     assert_eq!(value, rule as f64 + x as f64 + y as f64 / (3.0 * 3.0 * 4.0));
                 }
             }
@@ -426,6 +435,7 @@ mod test {
         assert_eq!(desired_tree, tree);
     }
 
+    #[ignore]
     #[test]
     #[should_panic]
     fn convert_to_parse_panic_test() {

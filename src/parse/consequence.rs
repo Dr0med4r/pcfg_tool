@@ -47,7 +47,7 @@ impl Ord for Consequence {
             Ordering::Equal => {
                 let item = self.item.cmp(&other.item);
                 if item != Ordering::Equal {
-                    return item
+                    return item;
                 }
                 let start = self.start.cmp(&other.start);
                 if start != Ordering::Equal {

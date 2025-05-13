@@ -77,11 +77,11 @@ fn insert_rule_into_map(
         .or_insert(HashMap::from_iter(vec![(rhs, rule.weight)]));
     match &rhs {
         Rhs::Unary(item) => {
-            insert_rule(rhs_grammar, rule.weight, &rhs, lhs, item);
+            insert_rule(rhs_grammar, rule.weight, rhs, lhs, item);
         }
         Rhs::Binary(item1, item2) => {
-            insert_rule(rhs_grammar, rule.weight, &rhs, lhs, item1);
-            insert_rule(rhs_grammar, rule.weight, &rhs, lhs, item2);
+            insert_rule(rhs_grammar, rule.weight, rhs, lhs, item1);
+            insert_rule(rhs_grammar, rule.weight, rhs, lhs, item2);
         }
     }
 }
@@ -89,16 +89,12 @@ fn insert_rule_into_map(
 fn insert_rule(
     rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
     weight: f64,
-    rhs: &Rhs<Item>,
+    rhs: Rhs<Item>,
     lhs: Item,
     item: &Item,
 ) {
     let set = rhs_grammar.entry(*item).or_default();
-    set.insert(Rule {
-        lhs,
-        rhs: *rhs,
-        weight,
-    });
+    set.insert(Rule { lhs, rhs, weight });
 }
 
 pub fn transform_sentence(line: &str, lexicon: &StringLookup) -> Vec<Item> {
@@ -132,7 +128,7 @@ pub fn deduce(
     }
     let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     while let Some(consequence) = queue.pop() {
-        if weight_map.get_consequence(&consequence) != 0.0 {
+        if weight_map.is_set(&consequence) {
             continue;
         }
         weight_map.set(consequence);

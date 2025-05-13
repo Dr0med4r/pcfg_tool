@@ -115,3 +115,19 @@ with btree and indexmap
 
       85,700469000 seconds user
        1,254310000 seconds sys
+with additional bitmap in weightmap for checking if set
+ Performance counter stats for './pcfg_tool parse training/large/grammar.rules training/large/grammar.lexicon':
+
+         21.782,99 msec task-clock:u                     #    0,999 CPUs utilized
+                 0      context-switches:u               #    0,000 /sec
+                 0      cpu-migrations:u                 #    0,000 /sec
+           496.957      page-faults:u                    #   22,814 K/sec
+    60.504.644.126      instructions:u                   #    1,24  insn per cycle
+    48.790.908.663      cycles:u                         #    2,240 GHz
+     9.468.363.529      branches:u                       #  434,668 M/sec
+       161.196.727      branch-misses:u                  #    1,70% of all branches
+
+      21,804966872 seconds time elapsed
+
+      20,164341000 seconds user
+       1,459286000 seconds sys

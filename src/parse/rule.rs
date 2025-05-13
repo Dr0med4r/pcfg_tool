@@ -78,7 +78,6 @@ impl Rule<String> {
             let Some(item) = last else { panic!() };
             Rhs::Unary(item)
         } else {
-            panic!();
             eprintln!("expecting binary rules");
             exit(1);
         };
