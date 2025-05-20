@@ -131,3 +131,19 @@ with additional bitmap in weightmap for checking if set
 
       20,164341000 seconds user
        1,459286000 seconds sys
+with weightmap for lookup in the max_queue
+ Performance counter stats for './pcfg_tool parse training/large/grammar.rules training/large/grammar.lexicon':
+
+         15.144,51 msec task-clock:u                     #    0,996 CPUs utilized
+                 0      context-switches:u               #    0,000 /sec
+                 0      cpu-migrations:u                 #    0,000 /sec
+           562.068      page-faults:u                    #   37,114 K/sec
+    55.089.062.990      instructions:u                   #    1,54  insn per cycle
+    35.763.937.963      cycles:u                         #    2,362 GHz
+     8.951.902.575      branches:u                       #  591,099 M/sec
+       170.173.732      branch-misses:u                  #    1,90% of all branches
+
+      15,202320399 seconds time elapsed
+
+      13,517187000 seconds user
+       1,512829000 seconds sys
