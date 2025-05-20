@@ -29,7 +29,7 @@ impl From<Item> for usize {
     }
 }
 
-fn triangle_index(triangle_length: u32, triangle: u32, i: u32, j: u32) -> usize {
+pub fn triangle_index(triangle_length: u32, triangle: u32, i: u32, j: u32) -> usize {
     ((triangle * elements(triangle_length))
         + elements(triangle_length - i - 1)
         + (triangle_length - j)) as usize
@@ -111,7 +111,22 @@ pub struct WeightMap<T> {
     sentence_length: u32,
 }
 
-impl WeightMap<f64> {
+impl<T> WeightMap<T>
+where
+    T: Default + Copy,
+{
+    pub fn with_capacity(items: usize, sentence_length: usize) -> Self {
+        let length = items * elements(sentence_length as u32) as usize;
+        let data = vec![T::default(); length];
+        let length = length / 8 + 1;
+        let map = vec![0; length];
+        WeightMap {
+            data,
+            map,
+            sentence_length: sentence_length as u32,
+        }
+    }
+
     fn index(&self, consequence: &Consequence) -> usize {
         // n: max_len index(a,b) = size(n-a-1) + n-b
         triangle_index(
@@ -122,38 +137,27 @@ impl WeightMap<f64> {
         )
     }
 
-    fn index_is_set(&self, index: usize) -> bool {
+    pub fn index_is_set(&self, index: usize) -> bool {
         let (index, rem) = (index / 8, index % 8);
         self.map[index] & 1 << rem > 0
     }
 
-    pub fn is_set(&self, consequence: &Consequence) -> bool {
-        assert!(consequence.start < consequence.end);
-        assert!(consequence.end <= self.sentence_length);
-        assert!(consequence.start < self.sentence_length);
-        let index = self.index(consequence);
-        self.index_is_set(index)
+    pub fn get_at_index(&self, index: usize) -> T {
+        self.data[index]
     }
-
-    pub fn get_with_index(&self, item: Item, start: u32, end: u32) -> f64 {
+    pub fn get_with_index(&self, item: Item, start: u32, end: u32) -> T {
         assert!(start < end);
         assert!(end <= self.sentence_length);
         assert!(start < self.sentence_length);
         self.data[triangle_index(self.sentence_length, u32::from(item), start, end)]
     }
 
-    pub fn with_capacity(items: usize, sentence_length: usize) -> Self {
-        let length = items * elements(sentence_length as u32) as usize;
-        let data = vec![0.0; length];
-        let length = length / 8 + 1;
-        let map = vec![0; length];
-        WeightMap {
-            data,
-            map,
-            sentence_length: sentence_length as u32,
-        }
+    pub fn set_index(&mut self, index: usize, value: T) {
+        self.data[index] = value;
     }
+}
 
+impl WeightMap<f64> {
     pub fn set(&mut self, consequence: Consequence) {
         let index = self.index(&consequence);
         let (map_index, rem) = (index / 8, index % 8);

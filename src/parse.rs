@@ -111,8 +111,9 @@ pub fn deduce(
     start_item: Item,
     number_of_items: usize,
 ) -> WeightMap<f64> {
-    let mut queue = MaxQueue::default();
     let sentence_length = line.len();
+    let mut queue = MaxQueue::new(number_of_items, sentence_length);
+    let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     for (index, word) in line.iter().enumerate() {
         for rule in rule_lookup
             .get(word)
@@ -126,11 +127,7 @@ pub fn deduce(
             });
         }
     }
-    let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
-    while let Some(consequence) = queue.pop() {
-        if weight_map.is_set(&consequence) {
-            continue;
-        }
+    while let Some(consequence) = queue.pop(|idx| !weight_map.index_is_set(idx)) {
         weight_map.set(consequence);
         if consequence.start == 0
             && consequence.end == sentence_length as u32
