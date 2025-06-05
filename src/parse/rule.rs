@@ -69,6 +69,10 @@ impl Rule<String> {
         };
         let last = rhs.pop();
         let first = rhs.pop();
+        if !rhs.is_empty() {
+            eprintln!("expecting binary rules");
+            exit(1);
+        }
         let rhs = if first.is_some() {
             let (Some(item1), Some(item2)) = (first, last) else {
                 panic!()
@@ -78,7 +82,7 @@ impl Rule<String> {
             let Some(item) = last else { panic!() };
             Rhs::Unary(item)
         } else {
-            eprintln!("expecting binary rules");
+            eprintln!("malformed rules");
             exit(1);
         };
         Rule { lhs, rhs, weight }

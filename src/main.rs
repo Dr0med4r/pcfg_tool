@@ -1,6 +1,7 @@
 mod argparse;
 mod induce;
 mod parse;
+mod unk;
 
 use std::{
     fs::File,
@@ -15,6 +16,7 @@ use induce::{induce_grammar, write_grammar};
 use parse::{
     deduce, parse_rules, string_lookup::StringLookup, transform_sentence, weight_map::Item,
 };
+use unk::unk;
 
 fn main() {
     let args = Args::parse();
@@ -37,12 +39,7 @@ fn main() {
                 Some(paradigma) if paradigma == &"cyk".to_string() => exit(22),
                 _ => {}
             }
-            if *unking
-                || *smoothing
-                || threshold_beam.is_some()
-                || rank_beam.is_some()
-                || astar.is_some()
-            {
+            if *smoothing || threshold_beam.is_some() || rank_beam.is_some() || astar.is_some() {
                 exit(22);
             }
             let mut string_lookup = StringLookup::default();
@@ -67,7 +64,7 @@ fn main() {
                     eprintln!("error reading line {}", line_number + 1);
                     exit(1);
                 };
-                let line_items = transform_sentence(&line, &string_lookup);
+                let line_items = transform_sentence(&line, &string_lookup, unking);
                 let initial_nonterminal = Item::NonTerminal(
                     string_lookup
                         .get(initial_nonterminal)
@@ -97,6 +94,9 @@ fn main() {
                     println!("{tree}")
                 }
             }
+        }
+        Commands::Unk { threshold } => {
+            unk(*threshold);
         }
 
         _ => {

@@ -37,11 +37,11 @@ pub fn parse_rules(
             eprintln!("cannot read rule");
             exit(1);
         };
-        insert_rule_into_map(string_map, is_rule, rhs_grammar, all_rules, line);
+        insert_into_lookup(string_map, is_rule, rhs_grammar, all_rules, line);
     }
 }
 
-fn insert_rule_into_map(
+fn insert_into_lookup(
     string_map: &mut StringLookup,
     is_rule: bool,
     rhs_grammar: &mut HashMap<Item, HashSet<Rule<Item>>>,
@@ -97,10 +97,23 @@ fn insert_rule(
     set.insert(Rule { lhs, rhs, weight });
 }
 
-pub fn transform_sentence(line: &str, lexicon: &StringLookup) -> Vec<Item> {
+pub fn transform_sentence(line: &str, lexicon: &StringLookup, unking: &bool) -> Vec<Item> {
     line.split_whitespace()
         .map(|word| {
-            Item::Terminal(lexicon.get(word).expect("this word is not in the lexicon") as u32)
+            let word_id = match lexicon.get(word) {
+                Some(u) => u,
+                None => {
+                    if *unking {
+                        lexicon
+                            .get("UNK")
+                            .expect("UNK is not in the lexicon. Did you use an unked input?")
+                    } else {
+                        eprintln!("'{}' is not in the lexicon. Maybe use unking", word);
+                        exit(1)
+                    }
+                }
+            } as u32;
+            Item::Terminal(word_id)
         })
         .collect()
 }
@@ -248,7 +261,7 @@ mod test {
         let mut rhs_grammar = HashMap::new();
         let mut all_rules = HashMap::new();
         let line = "A -> B C 0.57".to_string();
-        insert_rule_into_map(
+        insert_into_lookup(
             &mut string_map,
             is_rule,
             &mut rhs_grammar,
@@ -286,7 +299,7 @@ mod test {
         let mut rhs_grammar = HashMap::new();
         let mut all_rules = HashMap::new();
         let line = "A C 0.57".to_string();
-        insert_rule_into_map(
+        insert_into_lookup(
             &mut string_map,
             is_rule,
             &mut rhs_grammar,
@@ -312,7 +325,7 @@ mod test {
         let mut rhs_grammar = HashMap::new();
         let mut all_rules = HashMap::new();
         let lexicon_line = "B D 0.57".to_string();
-        insert_rule_into_map(
+        insert_into_lookup(
             &mut string_map,
             false,
             &mut rhs_grammar,
@@ -320,7 +333,7 @@ mod test {
             lexicon_line,
         );
         let rule_line = "A -> B C 0.57".to_string();
-        insert_rule_into_map(
+        insert_into_lookup(
             &mut string_map,
             true,
             &mut rhs_grammar,
@@ -388,7 +401,7 @@ mod test {
             "W1 T 0.2".to_string(),
         ];
         for line in lexicon {
-            insert_rule_into_map(&mut string_map, false, &mut grammar, &mut all_rules, line);
+            insert_into_lookup(&mut string_map, false, &mut grammar, &mut all_rules, line);
         }
         let rules = vec![
             "ROOT -> W1 W2 0.25".to_string(),
@@ -396,12 +409,12 @@ mod test {
             "W1 -> W2 0.6".to_string(),
         ];
         for line in rules {
-            insert_rule_into_map(&mut string_map, true, &mut grammar, &mut all_rules, line);
+            insert_into_lookup(&mut string_map, true, &mut grammar, &mut all_rules, line);
         }
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
 
-        let line = transform_sentence("R S T", &string_map);
+        let line = transform_sentence("R S T", &string_map, &false);
         let mut desired_weight_map = WeightMap::with_capacity(string_map.len(), line.len());
         // R: 0
         // W1: 1

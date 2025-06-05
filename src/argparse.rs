@@ -42,11 +42,16 @@ pub enum Commands {
         #[arg(short, long)]
         astar: Option<PathBuf>,
     },
-    Binarise {},
+    Binarise {
+        #[arg(short, long, default_value_t=999)]
+        horizontal: u64,
+        #[arg(short, long, default_value_t=1)]
+        vertical: u64,
+    },
     Debinarise {},
     Unk {
         #[arg(short, long)]
-        threshold: Option<u64>,
+        threshold: u64,
     },
     Smooth {
         #[arg(short, long)]

@@ -30,6 +30,16 @@ impl<T> ParseTree<T> {
             child.execute_for_nodes(f);
         }
     }
+
+    pub fn change_nodes<N>(&mut self, f: &mut N)
+    where
+        N: FnMut(&mut Self),
+    {
+        f(self);
+        for child in &mut self.children {
+            child.change_nodes(f);
+        }
+    }
 }
 
 impl<T: Display> Display for ParseTree<T> {

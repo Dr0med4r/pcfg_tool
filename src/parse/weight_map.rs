@@ -286,7 +286,7 @@ impl WeightMap<f64> {
 mod test {
     use foldhash::HashMapExt;
 
-    use crate::parse::{deduce, insert_rule_into_map, transform_sentence};
+    use crate::parse::{deduce, insert_into_lookup, transform_sentence};
 
     use super::*;
 
@@ -394,7 +394,7 @@ mod test {
             "W1 T 0.3".to_string(),
         ];
         for line in lexicon {
-            insert_rule_into_map(&mut string_map, false, &mut grammar, &mut all_rules, line);
+            insert_into_lookup(&mut string_map, false, &mut grammar, &mut all_rules, line);
         }
         let rules = vec![
             "ROOT -> W1 W2 0.25".to_string(),
@@ -402,12 +402,12 @@ mod test {
             "W1 -> W2 0.6".to_string(),
         ];
         for line in rules {
-            insert_rule_into_map(&mut string_map, true, &mut grammar, &mut all_rules, line);
+            insert_into_lookup(&mut string_map, true, &mut grammar, &mut all_rules, line);
         }
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
 
-        let line = transform_sentence("T S", &string_map);
+        let line = transform_sentence("T S", &string_map, &false);
         let weight_map = deduce(&line, &grammar, initial, string_map.len());
         let tree = weight_map.convert_to_parse_tree(
             initial,
@@ -452,7 +452,7 @@ mod test {
             "W1 T 0.3".to_string(),
         ];
         for line in lexicon {
-            insert_rule_into_map(&mut string_map, false, &mut grammar, &mut all_rules, line);
+            insert_into_lookup(&mut string_map, false, &mut grammar, &mut all_rules, line);
         }
         let rules = vec![
             "ROOT -> W1 W2 0.25".to_string(),
@@ -460,11 +460,11 @@ mod test {
             "W1 -> W2 0.6".to_string(),
         ];
         for line in rules {
-            insert_rule_into_map(&mut string_map, true, &mut grammar, &mut all_rules, line);
+            insert_into_lookup(&mut string_map, true, &mut grammar, &mut all_rules, line);
         }
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
-        let line = transform_sentence("R S T", &string_map);
+        let line = transform_sentence("R S T", &string_map, &false);
         let weight_map = deduce(&line, &grammar, initial, string_map.len());
         weight_map.convert_to_parse_tree(
             initial,
