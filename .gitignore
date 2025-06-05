@@ -9,3 +9,6 @@ pcfg_tool
 *.words
 *.rules
 *.lexicon
+*.txt
+*.mrg
+perf.data
