@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(version, about, long_about=None)]
+#[command(version, about, long_about=None, disable_help_flag=true)]
 pub struct Args {
     #[command(subcommand)]
     pub command: Commands,
