@@ -1,7 +1,5 @@
 use std::{
-    collections::HashSet,
-    io::{self, Write},
-    process::exit,
+    collections::HashSet, fs::File, io::{self, Write}, process::exit
 };
 
 use foldhash::{HashMap, HashMapExt};
@@ -13,6 +11,33 @@ pub mod parse_tree;
 pub enum Rhs {
     Terminal(String),
     NonTerminals(Vec<String>),
+}
+
+
+
+pub fn induce(grammar: &Option<String>) {
+    let (mut rules, mut lexicon, mut words) = match grammar {
+        Some(grammar_location) => {
+            let rules_location = File::create(format!("{grammar_location}.rules"))
+                .expect("GRAMMAR.rules is not a correct location");
+            let lexicon_location = File::create(format!("{grammar_location}.lexicon"))
+                .expect("GRAMMAR.lexicon is not a correct location");
+            let words_location = File::create(format!("{grammar_location}.words"))
+                .expect("GRAMMAR.words is not a correct location");
+            (
+                Box::new(rules_location) as Box<dyn Write>,
+                Box::new(lexicon_location) as Box<dyn Write>,
+                Box::new(words_location) as Box<dyn Write>,
+            )
+        }
+        None => (
+            Box::new(io::stdout()) as Box<dyn Write>,
+            Box::new(io::stdout()) as Box<dyn Write>,
+            Box::new(io::stdout()) as Box<dyn Write>,
+        ),
+    };
+    let grammar = induce_grammar();
+    write_grammar(&mut rules, &mut lexicon, &mut words, &grammar);
 }
 
 /// writes the grammar rules from the `tree` into `grammar` and counts the ocurrences of each rule

@@ -17,6 +17,10 @@ pub struct ParseTree<T> {
 }
 
 impl<T> ParseTree<T> {
+    pub fn new(root: T) -> Self {
+        Self { root, children: vec![] }
+    }
+
     pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }

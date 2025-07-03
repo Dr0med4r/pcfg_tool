@@ -6,19 +6,90 @@ pub mod weight_map;
 
 use std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{self, BufRead, BufReader},
     path::Path,
     process::exit,
 };
 
 use crate::parse::rule::Rule;
 use consequence::Consequence;
-use foldhash::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use foldhash::HashSet;
 use max_queue::MaxQueue;
 use rule::Rhs;
 use string_lookup::StringLookup;
 use weight_map::{Item, WeightMap};
+
+
+pub fn parse(
+    rules: &Path,
+    lexicon: &Path,
+    paradigma: &Option<String>,
+    initial_nonterminal: &str,
+    unking: &bool,
+    smoothing: &bool,
+    threshold_beam: &Option<u64>,
+    rank_beam: &Option<u64>,
+    astar: &Option<std::path::PathBuf>,
+) {
+    match paradigma {
+        Some(paradigma) if paradigma == &"cyk".to_string() => exit(22),
+        _ => {}
+    }
+    if *smoothing || threshold_beam.is_some() || rank_beam.is_some() || astar.is_some() {
+        exit(22);
+    }
+    let mut string_lookup = StringLookup::default();
+    let mut rule_lookup = HashMap::new();
+    let mut all_rules = HashMap::new();
+    parse_rules(
+        &mut string_lookup,
+        &mut rule_lookup,
+        &mut all_rules,
+        rules,
+        true,
+    );
+    parse_rules(
+        &mut string_lookup,
+        &mut rule_lookup,
+        &mut all_rules,
+        lexicon,
+        false,
+    );
+    for (line_number, line) in io::stdin().lines().enumerate() {
+        let Ok(line) = line else {
+            eprintln!("error reading line {}", line_number + 1);
+            exit(1);
+        };
+        let line_items = transform_sentence(&line, &string_lookup, unking);
+        let initial_nonterminal = Item::NonTerminal(
+            string_lookup
+                .get(initial_nonterminal)
+                .expect("initial nonterminal is not in the rules") as u32,
+        );
+        rule_lookup.entry(initial_nonterminal).or_default();
+        let rule_weights = deduce(
+            &line_items,
+            &rule_lookup,
+            initial_nonterminal,
+            string_lookup.len(),
+        );
+        if rule_weights.get_with_index(initial_nonterminal, 0, line_items.len() as u32) == 0.0 {
+            println!("(NOPARSE {})", line)
+        } else {
+            let tree = rule_weights.convert_to_parse_tree(
+                initial_nonterminal,
+                0,
+                line_items.len() as u32,
+                &string_lookup,
+                &all_rules,
+                &mut line_items.into(),
+            );
+            println!("{tree}")
+        }
+    }
+}
+
 
 /// appends rules into all_rules and all nonterminals as keys into lookup_rules
 pub fn parse_rules(
