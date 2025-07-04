@@ -44,7 +44,6 @@ fn demarkovize(string: &str) -> Option<&str> {
 }
 
 fn debinarise_tree(tree: ParseTree<&str>) -> ParseTree<String> {
-    eprintln!("root: {}", tree.root);
     let root = if tree.root.find('^').is_some() {
         tree.root.split('^').next().unwrap().to_string()
     } else {
@@ -153,9 +152,7 @@ mod test {
                 ],
             }],
         };
-        eprintln!("{}", test_tree);
         let correct = debinarise_tree(test_tree);
-        eprintln!("{}", correct);
         assert_eq!(correct, expected_tree);
     }
 }
