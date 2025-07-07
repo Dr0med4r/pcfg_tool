@@ -55,7 +55,7 @@ pub enum Commands {
     },
     Smooth {
         #[arg(short, long)]
-        threshold: Option<u64>,
+        threshold: u64,
     },
     Outside {
         #[arg(value_name = "RULES")]

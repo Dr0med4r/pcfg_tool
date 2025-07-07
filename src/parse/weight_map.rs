@@ -407,7 +407,7 @@ mod test {
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
 
-        let line = transform_sentence("T S", &string_map, &false);
+        let line = transform_sentence("T S", &string_map, &false, &false);
         let weight_map = deduce(&line, &grammar, initial, string_map.len());
         let tree = weight_map.convert_to_parse_tree(
             initial,
@@ -464,7 +464,7 @@ mod test {
         }
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
-        let line = transform_sentence("R S T", &string_map, &false);
+        let line = transform_sentence("R S T", &string_map, &false, &false);
         let weight_map = deduce(&line, &grammar, initial, string_map.len());
         weight_map.convert_to_parse_tree(
             initial,

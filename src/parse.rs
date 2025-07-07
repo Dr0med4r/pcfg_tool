@@ -11,15 +11,14 @@ use std::{
     process::exit,
 };
 
-use crate::parse::rule::Rule;
+use crate::{parse::rule::Rule, smoothing::smooth_word};
 use consequence::Consequence;
-use foldhash::{HashMap, HashMapExt};
 use foldhash::HashSet;
+use foldhash::{HashMap, HashMapExt};
 use max_queue::MaxQueue;
 use rule::Rhs;
 use string_lookup::StringLookup;
 use weight_map::{Item, WeightMap};
-
 
 pub fn parse(
     rules: &Path,
@@ -36,7 +35,7 @@ pub fn parse(
         Some(paradigma) if paradigma == &"cyk".to_string() => exit(22),
         _ => {}
     }
-    if *smoothing || threshold_beam.is_some() || rank_beam.is_some() || astar.is_some() {
+    if threshold_beam.is_some() || rank_beam.is_some() || astar.is_some() {
         exit(22);
     }
     let mut string_lookup = StringLookup::default();
@@ -61,7 +60,7 @@ pub fn parse(
             eprintln!("error reading line {}", line_number + 1);
             exit(1);
         };
-        let line_items = transform_sentence(&line, &string_lookup, unking);
+        let line_items = transform_sentence(&line, &string_lookup, unking, smoothing);
         let initial_nonterminal = Item::NonTerminal(
             string_lookup
                 .get(initial_nonterminal)
@@ -89,7 +88,6 @@ pub fn parse(
         }
     }
 }
-
 
 /// appends rules into all_rules and all nonterminals as keys into lookup_rules
 pub fn parse_rules(
@@ -168,7 +166,12 @@ fn insert_rule(
     set.insert(Rule { lhs, rhs, weight });
 }
 
-pub fn transform_sentence(line: &str, lexicon: &StringLookup, unking: &bool) -> Vec<Item> {
+pub fn transform_sentence(
+    line: &str,
+    lexicon: &StringLookup,
+    unking: &bool,
+    smoothing: &bool,
+) -> Vec<Item> {
     line.split_whitespace()
         .map(|word| {
             let word_id = match lexicon.get(word) {
@@ -178,6 +181,11 @@ pub fn transform_sentence(line: &str, lexicon: &StringLookup, unking: &bool) -> 
                         lexicon
                             .get("UNK")
                             .expect("UNK is not in the lexicon. Did you use an unked input?")
+                    } else if *smoothing {
+                        lexicon.get(&smooth_word(word, true)).unwrap_or_else(|| {
+                            eprintln!("{} is not in the lexicon. Use smoothed input or the input data is not sufficient", word);
+                            exit(1);
+                        })
                     } else {
                         eprintln!("'{}' is not in the lexicon. Maybe use unking", word);
                         exit(1)
@@ -485,7 +493,7 @@ mod test {
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
 
-        let line = transform_sentence("R S T", &string_map, &false);
+        let line = transform_sentence("R S T", &string_map, &false, &false);
         let mut desired_weight_map = WeightMap::with_capacity(string_map.len(), line.len());
         // R: 0
         // W1: 1
