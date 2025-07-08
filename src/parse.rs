@@ -183,8 +183,10 @@ pub fn transform_sentence(
                             .expect("UNK is not in the lexicon. Did you use an unked input?")
                     } else if *smoothing {
                         lexicon.get(&smooth_word(word, true)).unwrap_or_else(|| {
+                            lexicon.get("UNK-S").unwrap_or_else(|| {
                             eprintln!("{} is not in the lexicon. Use smoothed input or the input data is not sufficient", word);
                             exit(1);
+                            })
                         })
                     } else {
                         eprintln!("'{}' is not in the lexicon. Maybe use unking", word);

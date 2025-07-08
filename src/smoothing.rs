@@ -50,13 +50,15 @@ where
 }
 
 pub fn smooth_word(word: &str, first: bool) -> String {
+    let first_char = word.chars().next();
+
     // does this even happen?
     let letter_suffix = if word.is_empty() {
-        "-S"
-    } else if word.chars().all(|e| e.is_uppercase()) {
-        // All Caps
+        return "UNK".to_string();
+    } else if first_char.is_some_and(char::is_uppercase) && !has_any(word, char::is_lowercase) {
+        // All Caps or numbers
         "-AC"
-    } else if word.chars().next().is_some_and(|e| e.is_uppercase()) {
+    } else if first_char.is_some_and(char::is_uppercase) {
         // Capital word
         if first { "-SC" } else { "-C" }
     } else if has_any(word, char::is_lowercase) {
@@ -70,7 +72,7 @@ pub fn smooth_word(word: &str, first: bool) -> String {
         "-S"
     };
 
-    let number_suffix = if word.chars().all(|e| e.is_numeric()) {
+    let number_suffix = if word.chars().all(char::is_numeric) {
         // is a number
         "-N"
     } else if has_any(word, char::is_numeric) {
@@ -100,9 +102,10 @@ pub fn smooth_word(word: &str, first: bool) -> String {
         ""
     };
 
-    let word_suffix = if word.len() > 3 && word.chars().last().unwrap().is_alphabetic() {
+    let last = word.chars().last();
+    let word_suffix = if word.len() > 3 && last.unwrap().is_alphabetic() {
         // add the last character if it is a letter
-        &("-".to_string() + &word.chars().last().unwrap().to_lowercase().to_string())[..]
+        &("-".to_string() + &last.unwrap().to_lowercase().to_string())[..]
     } else {
         ""
     };

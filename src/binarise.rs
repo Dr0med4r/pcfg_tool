@@ -104,7 +104,7 @@ fn add_parents(parents: &[String], vertical: u64) -> String {
     if parents.is_empty() || vertical == 1 {
         return "".into();
     }
-    let start = max(parents.len() as i64 - vertical as i64, 0) as usize;
+    let start = max(parents.len() as i64 - vertical as i64 + 1, 0) as usize;
     let mut node = "^<".to_string();
 
     node += &parents[start..]
