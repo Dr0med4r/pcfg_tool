@@ -5,8 +5,8 @@ mod parse;
 mod unk;
 mod binarise;
 mod smoothing;
+mod astar;
 
-use std::process::exit;
 
 use argparse::{Args, Commands};
 use clap::Parser;
@@ -16,6 +16,7 @@ use induce::induce;
 use parse::parse;
 use smoothing::smooth;
 use unk::unk;
+use astar::out;
 
 fn main() {
     let args = Args::parse();
@@ -63,8 +64,10 @@ fn main() {
         Commands::Smooth { threshold } => {
             smooth(*threshold);
         }
-        _ => {
-            exit(22);
+
+        Commands::Outside { rules, lexicon, grammar, initial_nonterminal } => {
+            out(rules, lexicon, grammar, initial_nonterminal);
+
         }
     }
 }

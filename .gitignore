@@ -11,4 +11,5 @@ pcfg_tool
 *.lexicon
 *.txt
 *.mrg
+*.outside
 perf.data
