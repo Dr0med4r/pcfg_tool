@@ -55,21 +55,25 @@ pub fn parse(
         lexicon,
         false,
     );
+    let initial_nonterminal = Item::NonTerminal(
+        string_lookup
+            .get(initial_nonterminal)
+            .expect("initial nonterminal is not in the rules") as u32,
+    );
+    rule_lookup.entry(initial_nonterminal).or_default();
+    let mut rule_lookup_vec = vec![vec![]; rule_lookup.len()];
+    for (item, set) in rule_lookup {
+        rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
+    }
     for (line_number, line) in io::stdin().lines().enumerate() {
         let Ok(line) = line else {
             eprintln!("error reading line {}", line_number + 1);
             exit(1);
         };
         let line_items = transform_sentence(&line, &string_lookup, unking, smoothing);
-        let initial_nonterminal = Item::NonTerminal(
-            string_lookup
-                .get(initial_nonterminal)
-                .expect("initial nonterminal is not in the rules") as u32,
-        );
-        rule_lookup.entry(initial_nonterminal).or_default();
         let rule_weights = deduce(
             &line_items,
-            &rule_lookup,
+            &rule_lookup_vec,
             initial_nonterminal,
             string_lookup.len(),
         );
@@ -201,7 +205,7 @@ pub fn transform_sentence(
 
 pub fn deduce(
     line: &[Item],
-    rule_lookup: &HashMap<Item, HashSet<Rule<Item>>>,
+    rule_lookup: &[Vec<Rule<Item>>],
     start_item: Item,
     number_of_items: usize,
 ) -> WeightMap<f64> {
@@ -210,7 +214,7 @@ pub fn deduce(
     let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     for (index, word) in line.iter().enumerate() {
         for rule in rule_lookup
-            .get(word)
+            .get(usize::from(*word))
             .expect("there is no rule that produces the word")
         {
             queue.push(Consequence {
@@ -231,7 +235,7 @@ pub fn deduce(
         }
         // iterate over all rules with the item on the right
         for rule in rule_lookup
-            .get(&consequence.item)
+            .get(usize::from(consequence.item))
             .expect("there should be a rule with each nonterminal")
         {
             match rule.rhs {
@@ -494,6 +498,10 @@ mod test {
         }
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
+        let mut rule_lookup_vec = vec![vec![]; grammar.len()];
+        for (item, set) in grammar {
+            rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
+        }
 
         let line = transform_sentence("R S T", &string_map, &false, &false);
         let mut desired_weight_map = WeightMap::with_capacity(string_map.len(), line.len());
@@ -533,7 +541,7 @@ mod test {
             end: 2,
             weight: 0.05,
         });
-        let weight_map = deduce(&line, &grammar, initial, string_map.len());
+        let weight_map = deduce(&line, &rule_lookup_vec, initial, string_map.len());
         assert_eq!(weight_map, desired_weight_map);
     }
 }

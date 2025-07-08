@@ -18,7 +18,7 @@ pub enum Rhs<T> {
     Binary(T, T),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Rule<T> {
     pub lhs: T,
     pub rhs: Rhs<T>,
