@@ -11,7 +11,7 @@ use std::{
     process::exit,
 };
 
-use crate::{parse::rule::Rule, smoothing::smooth_word};
+use crate::{astar::ViterbiScore, parse::rule::Rule, smoothing::smooth_word};
 use consequence::Consequence;
 use foldhash::HashSet;
 use foldhash::{HashMap, HashMapExt};
@@ -35,9 +35,10 @@ pub fn parse(
         Some(paradigma) if paradigma == &"cyk".to_string() => exit(22),
         _ => {}
     }
-    if threshold_beam.is_some() || rank_beam.is_some() || astar.is_some() {
+    if threshold_beam.is_some() || rank_beam.is_some() {
         exit(22);
     }
+
     let mut string_lookup = StringLookup::default();
     let mut rule_lookup = HashMap::new();
     let mut all_rules = HashMap::new();
@@ -65,6 +66,15 @@ pub fn parse(
     for (item, set) in rule_lookup {
         rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
     }
+
+    let scores = if let Some(astar) = astar {
+        Some(
+            ViterbiScore::new_from_file(astar, &string_lookup)
+                .expect("Could not read from .outside file!"),
+        )
+    } else {
+        None
+    };
     for (line_number, line) in io::stdin().lines().enumerate() {
         let Ok(line) = line else {
             eprintln!("error reading line {}", line_number + 1);
@@ -74,6 +84,7 @@ pub fn parse(
         let rule_weights = deduce(
             &line_items,
             &rule_lookup_vec,
+            &scores,
             initial_nonterminal,
             string_lookup.len(),
         );
@@ -206,6 +217,7 @@ pub fn transform_sentence(
 pub fn deduce(
     line: &[Item],
     rule_lookup: &[Vec<Rule<Item>>],
+    scores: &Option<ViterbiScore>,
     start_item: Item,
     number_of_items: usize,
 ) -> WeightMap<f64> {

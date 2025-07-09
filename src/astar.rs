@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, Write},
+    io::{self, BufRead, Write},
     path::Path,
 };
 
@@ -13,6 +13,7 @@ use crate::parse::{
     string_lookup::StringLookup,
     weight_map::Item,
 };
+
 
 pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonterminal: &str) {
     let mut weights_location = match grammar {
@@ -54,7 +55,7 @@ pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonte
     score.print_weights(&mut weights_location, string_lookup);
 }
 
-struct ViterbiScore {
+pub struct ViterbiScore {
     r#in: Vec<f64>,
     out: Vec<f64>,
     all_rules: HashMap<Item, HashMap<Rhs<Item>, f64>>,
@@ -81,7 +82,26 @@ impl ViterbiScore {
         }
     }
 
-    fn get_outside(&self, item: Item) -> f64 {
+    pub fn new_from_file(path: &Path, string_lookup: &StringLookup)-> io::Result<Self>{
+
+        let file = File::open(path)?;
+        let mut scores = Self {
+            r#in: vec![],
+            out: vec![0f64; string_lookup.len()],
+            all_rules: HashMap::default(),
+            rule_lookup: vec![],
+            all_items: vec![],
+        };
+        for line in io::BufReader::new(file).lines().map_while(Result::ok) {
+            let (item, score) = line.split_once(" ").expect("Could not parse the .outside file!");
+            let score = score.parse::<f64>().expect("Could not convert score to float!");
+            let item = string_lookup.get(item).expect("The item is not in rules did you use the correct files?");
+            scores.out[item] = score;
+        }
+        Ok(scores)
+    }
+
+    pub fn get_outside(&self, item: Item) -> f64 {
         self.out[usize::from(item)]
     }
 
