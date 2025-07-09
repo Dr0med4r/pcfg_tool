@@ -14,7 +14,6 @@ use crate::parse::{
     weight_map::Item,
 };
 
-
 pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonterminal: &str) {
     let mut weights_location = match grammar {
         Some(location) => Box::new(
@@ -50,8 +49,24 @@ pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonte
         .get(initial_nonterminal)
         .expect("initial nonterminal not in grammar");
 
+    let nonterminal_indizes: Vec<usize> = all_items
+        .iter()
+        .filter(|e| match **e {
+            Item::NonTerminal(_) => true,
+            Item::Terminal(_) => false,
+        })
+        .map(|e| match *e {
+            Item::NonTerminal(a) => a as usize,
+            Item::Terminal(a) => a as usize,
+        })
+        .collect();
     let mut score = ViterbiScore::new(all_rules, rule_lookup_vec, all_items, initial_nonterminal);
     score.calculate_outside();
+    for x in score.out.iter().enumerate() {
+        if *x.1 == 0f64 && nonterminal_indizes.contains(&x.0) {
+            eprintln!("{} is zero ", string_lookup.get_string(x.0).unwrap());
+        }
+    }
     score.print_weights(&mut weights_location, string_lookup);
 }
 
@@ -82,8 +97,7 @@ impl ViterbiScore {
         }
     }
 
-    pub fn new_from_file(path: &Path, string_lookup: &StringLookup)-> io::Result<Self>{
-
+    pub fn new_from_file(path: &Path, string_lookup: &StringLookup) -> io::Result<Self> {
         let file = File::open(path)?;
         let mut scores = Self {
             r#in: vec![],
@@ -93,9 +107,15 @@ impl ViterbiScore {
             all_items: vec![],
         };
         for line in io::BufReader::new(file).lines().map_while(Result::ok) {
-            let (item, score) = line.split_once(" ").expect("Could not parse the .outside file!");
-            let score = score.parse::<f64>().expect("Could not convert score to float!");
-            let item = string_lookup.get(item).expect("The item is not in rules did you use the correct files?");
+            let (item, score) = line
+                .split_once(" ")
+                .expect("Could not parse the .outside file!");
+            let score = score
+                .parse::<f64>()
+                .expect("Could not convert score to float!");
+            let item = string_lookup
+                .get(item)
+                .expect("The item is not in rules did you use the correct files?");
             scores.out[item] = score;
         }
         Ok(scores)
@@ -110,7 +130,10 @@ impl ViterbiScore {
     }
 
     fn calculate_inside(&mut self) {
-        for item in &self.all_items {
+        for item in self.all_items.iter().filter(|e| match **e {
+            Item::NonTerminal(_) => true,
+            Item::Terminal(_) => false,
+        }) {
             let item_pos = usize::from(*item);
             let rules_with_item = self.all_rules.get(item);
             if rules_with_item.is_none() {
@@ -128,7 +151,10 @@ impl ViterbiScore {
         let mut changed = true;
         while changed {
             changed = false;
-            for item in &self.all_items {
+            for item in self.all_items.iter().filter(|e| match **e {
+                Item::NonTerminal(_) => true,
+                Item::Terminal(_) => false,
+            }) {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
                 for rule in &self.rule_lookup[item_pos] {
@@ -161,7 +187,10 @@ impl ViterbiScore {
         let mut changed = true;
         while changed {
             changed = false;
-            for item in &self.all_items {
+            for item in self.all_items.iter().filter(|e| match **e {
+                Item::NonTerminal(_) => true,
+                Item::Terminal(_) => false,
+            }) {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
                 for rule in &self.rule_lookup[item_pos] {

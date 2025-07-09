@@ -1,74 +1,63 @@
+use std::collections::BinaryHeap;
+
 use ordered_float::NotNan;
 use radix_heap::RadixHeapMap;
 
 use super::{
     consequence::Consequence,
-    weight_map::{Item, WeightMap, triangle_index},
+    weight_map::{WeightMap, triangle_index},
 };
 
-#[derive(Clone, Copy)]
-struct ConsequenceWithoutWeight {
-    start: u32,
-    item: Item,
-    end: u32,
+#[derive(PartialEq, Eq)]
+pub struct Key(NotNan<f64>, usize);
+
+impl PartialOrd for Key {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
-impl Default for ConsequenceWithoutWeight {
-    fn default() -> Self {
-        Self {
-            start: Default::default(),
-            item: Item::NonTerminal(0),
-            end: Default::default(),
-        }
+impl Ord for Key {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
 pub struct MaxQueue {
-    heap: RadixHeapMap<NotNan<f64>, usize>,
-    map: WeightMap<ConsequenceWithoutWeight>,
+    heap: BinaryHeap<Key>,
+    map: WeightMap<Consequence>,
     sentence_length: usize,
 }
 
 impl MaxQueue {
     pub fn new(items: usize, sentence_length: usize) -> Self {
         Self {
-            heap: RadixHeapMap::new_at(NotNan::try_from(1.0).unwrap()),
+            heap: BinaryHeap::default(),
             map: WeightMap::with_capacity(items, sentence_length),
             sentence_length,
         }
     }
 
     pub fn pop(&mut self, mut viable_option: impl FnMut(usize) -> bool) -> Option<Consequence> {
-        while let Some((weight, idx)) = self.heap.pop() {
+        while let Some(Key(_weight, idx)) = self.heap.pop() {
             if viable_option(idx) {
-                let remaining = self.map.get_at_index(idx);
-                return Some(Consequence {
-                    start: remaining.start,
-                    item: remaining.item,
-                    end: remaining.end,
-                    weight: *weight,
-                });
+                return Some(self.map.get_at_index(idx));
             }
         }
         None
     }
 
-    pub fn push(&mut self, item: Consequence) {
-        let part = ConsequenceWithoutWeight {
-            start: item.start,
-            item: item.item,
-            end: item.end,
-        };
+    pub fn push(&mut self, item: Consequence, key: f64) {
         let idx = triangle_index(
             self.sentence_length as u32,
             u32::from(item.item),
             item.start,
             item.end,
         );
-        self.map.set_index(idx, part);
-        self.heap.push(
-            NotNan::try_from(item.weight).expect("should not be NaN"),
-            idx,
-        );
+        if self.map.get_at_index(idx).weight < item.weight {
+            self.map.set_index(idx, item);
+        }
+        self.heap
+            .push(Key(NotNan::try_from(key).expect("should not be NaN"), idx));
     }
 }

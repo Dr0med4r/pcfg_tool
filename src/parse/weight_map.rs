@@ -12,6 +12,12 @@ pub enum Item {
     Terminal(u32),
 }
 
+impl Default for Item {
+    fn default() -> Self {
+        Self::NonTerminal(0)
+    }
+}
+
 impl From<Item> for u32 {
     fn from(val: Item) -> Self {
         match val {

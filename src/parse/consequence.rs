@@ -5,7 +5,7 @@ use std::{
 
 use super::weight_map::Item;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Consequence {
     pub start: u32,
     pub item: Item,

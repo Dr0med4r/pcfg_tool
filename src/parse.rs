@@ -67,14 +67,10 @@ pub fn parse(
         rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
     }
 
-    let scores = if let Some(astar) = astar {
-        Some(
-            ViterbiScore::new_from_file(astar, &string_lookup)
-                .expect("Could not read from .outside file!"),
-        )
-    } else {
-        None
-    };
+    let scores = astar.as_ref().map(|astar| {
+        ViterbiScore::new_from_file(astar, &string_lookup)
+            .expect("Could not read from .outside file!")
+    });
     for (line_number, line) in io::stdin().lines().enumerate() {
         let Ok(line) = line else {
             eprintln!("error reading line {}", line_number + 1);
@@ -84,7 +80,7 @@ pub fn parse(
         let rule_weights = deduce(
             &line_items,
             &rule_lookup_vec,
-            &scores,
+            scores.as_ref(),
             initial_nonterminal,
             string_lookup.len(),
         );
@@ -217,7 +213,7 @@ pub fn transform_sentence(
 pub fn deduce(
     line: &[Item],
     rule_lookup: &[Vec<Rule<Item>>],
-    scores: &Option<ViterbiScore>,
+    scores: Option<&ViterbiScore>,
     start_item: Item,
     number_of_items: usize,
 ) -> WeightMap<f64> {
@@ -229,12 +225,15 @@ pub fn deduce(
             .get(usize::from(*word))
             .expect("there is no rule that produces the word")
         {
-            queue.push(Consequence {
-                start: index as u32,
-                item: rule.lhs,
-                end: (index + 1) as u32,
-                weight: rule.weight,
-            });
+            queue.push(
+                Consequence {
+                    start: index as u32,
+                    item: rule.lhs,
+                    end: (index + 1) as u32,
+                    weight: rule.weight,
+                },
+                rule.weight,
+            );
         }
     }
     while let Some(consequence) = queue.pop(|idx| !weight_map.index_is_set(idx)) {
@@ -252,11 +251,25 @@ pub fn deduce(
         {
             match rule.rhs {
                 Rhs::Unary(_) => {
-                    add_replace(&mut queue, rule, &consequence);
+                    add_replace(&mut queue, rule, &consequence, scores);
                 }
                 Rhs::Binary(item1, item2) => {
-                    add_left(&mut queue, &weight_map, rule, (item1, item2), &consequence);
-                    add_right(&mut queue, &weight_map, rule, (item1, item2), &consequence);
+                    add_left(
+                        &mut queue,
+                        &weight_map,
+                        rule,
+                        (item1, item2),
+                        &consequence,
+                        scores,
+                    );
+                    add_right(
+                        &mut queue,
+                        &weight_map,
+                        rule,
+                        (item1, item2),
+                        &consequence,
+                        scores,
+                    );
                 }
             }
         }
@@ -264,14 +277,28 @@ pub fn deduce(
     weight_map
 }
 
-fn add_replace(queue: &mut MaxQueue, rule: &Rule<Item>, consequence: &Consequence) {
+fn add_replace(
+    queue: &mut MaxQueue,
+    rule: &Rule<Item>,
+    consequence: &Consequence,
+    scores: Option<&ViterbiScore>,
+) {
     // if there is a rule with the item on the right side replace it with the left side
-    queue.push(Consequence {
-        start: consequence.start,
-        item: rule.lhs,
-        end: consequence.end,
-        weight: consequence.weight * rule.weight,
-    })
+    let weight = consequence.weight * rule.weight;
+    let key = if let Some(scores) = scores {
+        weight * scores.get_outside(rule.lhs)
+    } else {
+        weight
+    };
+    queue.push(
+        Consequence {
+            start: consequence.start,
+            item: rule.lhs,
+            end: consequence.end,
+            weight,
+        },
+        key,
+    )
 }
 
 fn add_right(
@@ -280,6 +307,7 @@ fn add_right(
     rule: &Rule<Item>,
     rhs: (Item, Item),
     consequence: &Consequence,
+    scores: Option<&ViterbiScore>,
 ) {
     // if there is a rule with the item last
     // add all consequences to the queue where the sequence of items is in the weight map
@@ -287,13 +315,22 @@ fn add_right(
     // then Consequence {start: item1.start, item: lhs, end: itemn.end } is added
     if consequence.item == rhs.1 {
         for next in weight_map.get_ends_at(rhs.0, consequence.start) {
-            queue.push(Consequence {
-                start: next.start,
-                item: rule.lhs,
-                end: consequence.end,
-                // always multiply left with right to preserve same value
-                weight: next.weight * consequence.weight * rule.weight,
-            });
+            let weight = next.weight * consequence.weight * rule.weight;
+            let key = if let Some(scores) = scores {
+                weight * scores.get_outside(rule.lhs)
+            } else {
+                weight
+            };
+            queue.push(
+                Consequence {
+                    start: next.start,
+                    item: rule.lhs,
+                    end: consequence.end,
+                    // always multiply left with right to preserve same value
+                    weight,
+                },
+                key,
+            );
         }
     }
 }
@@ -304,6 +341,7 @@ fn add_left(
     rule: &Rule<Item>,
     rhs: (Item, Item),
     consequence: &Consequence,
+    scores: Option<&ViterbiScore>,
 ) {
     // if there is a rule with the item first
     // add all consequences to the queue where the sequence of items is in the weight map
@@ -311,13 +349,22 @@ fn add_left(
     // then Consequence {start: item1.start, item: lhs, end: itemn.end } is added
     if consequence.item == rhs.0 {
         for next in weight_map.get_starts_at(rhs.1, consequence.end) {
-            queue.push(Consequence {
-                start: consequence.start,
-                item: rule.lhs,
-                end: next.end,
-                // always multiply left with right to preserve same value
-                weight: consequence.weight * next.weight * rule.weight,
-            });
+            let weight = consequence.weight * next.weight * rule.weight;
+            let key = if let Some(scores) = scores {
+                weight * scores.get_outside(rule.lhs)
+            } else {
+                weight
+            };
+            queue.push(
+                Consequence {
+                    start: consequence.start,
+                    item: rule.lhs,
+                    end: next.end,
+                    // always multiply left with right to preserve same value
+                    weight,
+                },
+                key,
+            );
         }
     }
 }
