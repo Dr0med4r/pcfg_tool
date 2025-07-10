@@ -1,7 +1,6 @@
 use std::collections::BinaryHeap;
 
 use ordered_float::NotNan;
-use radix_heap::RadixHeapMap;
 
 use super::{
     consequence::Consequence,

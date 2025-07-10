@@ -600,7 +600,7 @@ mod test {
             end: 2,
             weight: 0.05,
         });
-        let weight_map = deduce(&line, &rule_lookup_vec, initial, string_map.len());
+        let weight_map = deduce(&line, &rule_lookup_vec,None, initial, string_map.len());
         assert_eq!(weight_map, desired_weight_map);
     }
 }

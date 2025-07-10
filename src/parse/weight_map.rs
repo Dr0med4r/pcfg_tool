@@ -418,7 +418,7 @@ mod test {
             rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
         }
         let line = transform_sentence("T S", &string_map, &false, &false);
-        let weight_map = deduce(&line, &rule_lookup_vec, initial, string_map.len());
+        let weight_map = deduce(&line, &rule_lookup_vec, None, initial, string_map.len());
         let tree = weight_map.convert_to_parse_tree(
             initial,
             0,
@@ -479,7 +479,7 @@ mod test {
             rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
         }
         let line = transform_sentence("R S T", &string_map, &false, &false);
-        let weight_map = deduce(&line, &rule_lookup_vec, initial, string_map.len());
+        let weight_map = deduce(&line, &rule_lookup_vec, None, initial, string_map.len());
         weight_map.convert_to_parse_tree(
             initial,
             0,

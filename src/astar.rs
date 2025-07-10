@@ -49,24 +49,8 @@ pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonte
         .get(initial_nonterminal)
         .expect("initial nonterminal not in grammar");
 
-    let nonterminal_indizes: Vec<usize> = all_items
-        .iter()
-        .filter(|e| match **e {
-            Item::NonTerminal(_) => true,
-            Item::Terminal(_) => false,
-        })
-        .map(|e| match *e {
-            Item::NonTerminal(a) => a as usize,
-            Item::Terminal(a) => a as usize,
-        })
-        .collect();
     let mut score = ViterbiScore::new(all_rules, rule_lookup_vec, all_items, initial_nonterminal);
     score.calculate_outside();
-    for x in score.out.iter().enumerate() {
-        if *x.1 == 0f64 && nonterminal_indizes.contains(&x.0) {
-            eprintln!("{} is zero ", string_lookup.get_string(x.0).unwrap());
-        }
-    }
     score.print_weights(&mut weights_location, string_lookup);
 }
 
