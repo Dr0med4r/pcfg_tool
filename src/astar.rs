@@ -40,7 +40,7 @@ pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonte
         lexicon,
         false,
     );
-    let all_items: Vec<Item> = rule_lookup.keys().map(Item::clone).collect();
+    let all_items: Vec<Item> = all_rules.keys().map(Item::clone).collect();
     let initial_nonterminal = string_lookup
         .get(initial_nonterminal)
         .expect("initial nonterminal not in grammar");
@@ -129,9 +129,7 @@ impl ViterbiScore {
                     // use NotNan for ordering
                     .map(|f| NotNan::new(*f).unwrap())
                     .max()
-                    .unwrap_or_else(|| {
-                        NotNan::new(0f64).unwrap()
-                    })
+                    .unwrap_or_else(|| NotNan::new(0f64).unwrap())
                     .into();
             }
         }
@@ -141,21 +139,23 @@ impl ViterbiScore {
             for item in &self.all_nonterminals {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
-                for rule in self.rule_lookup.get(item).unwrap() {
-                    let new_weight = self
-                        .all_rules
-                        .get(&rule.lhs)
-                        .unwrap()
-                        .get(&rule.rhs)
-                        .unwrap()
-                        * match rule.rhs {
-                            Rhs::Unary(item) => self.get_inside(item),
-                            Rhs::Binary(first, second) => {
-                                self.get_inside(first) * self.get_inside(second)
-                            }
-                        };
-                    if new_weight > weight {
-                        weight = new_weight;
+                if let Some(rules) = self.rule_lookup.get(item) {
+                    for rule in rules {
+                        let new_weight = self
+                            .all_rules
+                            .get(&rule.lhs)
+                            .unwrap()
+                            .get(&rule.rhs)
+                            .unwrap()
+                            * match rule.rhs {
+                                Rhs::Unary(item) => self.get_inside(item),
+                                Rhs::Binary(first, second) => {
+                                    self.get_inside(first) * self.get_inside(second)
+                                }
+                            };
+                        if new_weight > weight {
+                            weight = new_weight;
+                        }
                     }
                 }
                 if weight > self.get_inside(*item) {
@@ -174,26 +174,28 @@ impl ViterbiScore {
             for item in &self.all_nonterminals {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
-                for rule in self.rule_lookup.get(item).unwrap() {
-                    let weight_of_rule = self
-                        .all_rules
-                        .get(&rule.lhs)
-                        .unwrap()
-                        .get(&rule.rhs)
-                        .unwrap();
-                    let inside = match rule.rhs {
-                        Rhs::Unary(_) => 1f64,
-                        Rhs::Binary(first, second) => {
-                            if first == *item {
-                                self.get_inside(second)
-                            } else {
-                                self.get_inside(first)
+                if let Some(rules) = self.rule_lookup.get(item) {
+                    for rule in rules {
+                        let weight_of_rule = self
+                            .all_rules
+                            .get(&rule.lhs)
+                            .unwrap()
+                            .get(&rule.rhs)
+                            .unwrap();
+                        let inside = match rule.rhs {
+                            Rhs::Unary(_) => 1f64,
+                            Rhs::Binary(first, second) => {
+                                if first == *item {
+                                    self.get_inside(second)
+                                } else {
+                                    self.get_inside(first)
+                                }
                             }
+                        };
+                        let new_weight = self.get_outside(rule.lhs) * inside * weight_of_rule;
+                        if new_weight > weight {
+                            weight = new_weight;
                         }
-                    };
-                    let new_weight = self.get_outside(rule.lhs) * inside * weight_of_rule;
-                    if new_weight > weight {
-                        weight = new_weight;
                     }
                 }
                 if weight > self.out[item_pos] {
