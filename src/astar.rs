@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use foldhash::{HashMap, HashMapExt};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use ordered_float::NotNan;
 
 use crate::parse::{
@@ -41,15 +41,11 @@ pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonte
         false,
     );
     let all_items: Vec<Item> = rule_lookup.keys().map(Item::clone).collect();
-    let mut rule_lookup_vec = vec![vec![]; string_lookup.len()];
-    for (item, set) in rule_lookup {
-        rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
-    }
     let initial_nonterminal = string_lookup
         .get(initial_nonterminal)
         .expect("initial nonterminal not in grammar");
 
-    let mut score = ViterbiScore::new(all_rules, rule_lookup_vec, all_items, initial_nonterminal);
+    let mut score = ViterbiScore::new(all_rules, rule_lookup, all_items, initial_nonterminal);
     score.calculate_outside();
     score.print_weights(&mut weights_location, string_lookup);
 }
@@ -58,14 +54,14 @@ pub struct ViterbiScore {
     r#in: Vec<f64>,
     out: Vec<f64>,
     all_rules: HashMap<Item, HashMap<Rhs<Item>, f64>>,
-    rule_lookup: Vec<Vec<Rule<Item>>>,
+    rule_lookup: HashMap<Item, HashSet<Rule<Item>>>,
     all_nonterminals: Vec<Item>,
 }
 
 impl ViterbiScore {
     fn new(
         all_rules: HashMap<Item, HashMap<Rhs<Item>, f64>>,
-        rule_lookup: Vec<Vec<Rule<Item>>>,
+        rule_lookup: HashMap<Item, HashSet<Rule<Item>>>,
         all_items: Vec<Item>,
         initial_nonterminal: usize,
     ) -> Self {
@@ -94,7 +90,7 @@ impl ViterbiScore {
             r#in: vec![],
             out: vec![0f64; string_lookup.len()],
             all_rules: HashMap::default(),
-            rule_lookup: vec![],
+            rule_lookup: HashMap::default(),
             all_nonterminals: vec![],
         };
         for line in io::BufReader::new(file).lines().map_while(Result::ok) {
@@ -125,7 +121,6 @@ impl ViterbiScore {
             let item_pos = usize::from(*item);
             let rules_with_item = self.all_rules.get(item);
             if rules_with_item.is_none() {
-                eprintln!("why??");
                 self.r#in[item_pos] = 0f64;
             } else {
                 self.r#in[item_pos] = rules_with_item
@@ -135,7 +130,6 @@ impl ViterbiScore {
                     .map(|f| NotNan::new(*f).unwrap())
                     .max()
                     .unwrap_or_else(|| {
-                        eprintln!("why??");
                         NotNan::new(0f64).unwrap()
                     })
                     .into();
@@ -147,7 +141,7 @@ impl ViterbiScore {
             for item in &self.all_nonterminals {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
-                for rule in &self.rule_lookup[item_pos] {
+                for rule in self.rule_lookup.get(item).unwrap() {
                     let new_weight = self
                         .all_rules
                         .get(&rule.lhs)
@@ -180,26 +174,24 @@ impl ViterbiScore {
             for item in &self.all_nonterminals {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
-                for rule in &self.rule_lookup[item_pos] {
-                    let new_weight = self.get_outside(rule.lhs)
-                    // inside of children
-                        * match rule.rhs {
-                            Rhs::Unary(_) => 1f64,
-                            Rhs::Binary(first, second) => {
-                                if first == *item {
-                                    self.get_inside(second)
-                                } else {
-                                    self.get_inside(first)
-                                }
+                for rule in self.rule_lookup.get(item).unwrap() {
+                    let weight_of_rule = self
+                        .all_rules
+                        .get(&rule.lhs)
+                        .unwrap()
+                        .get(&rule.rhs)
+                        .unwrap();
+                    let inside = match rule.rhs {
+                        Rhs::Unary(_) => 1f64,
+                        Rhs::Binary(first, second) => {
+                            if first == *item {
+                                self.get_inside(second)
+                            } else {
+                                self.get_inside(first)
                             }
                         }
-                    // weight of rule
-                        * self
-                            .all_rules
-                            .get(&rule.lhs)
-                            .unwrap()
-                            .get(&rule.rhs)
-                            .unwrap();
+                    };
+                    let new_weight = self.get_outside(rule.lhs) * inside * weight_of_rule;
                     if new_weight > weight {
                         weight = new_weight;
                     }

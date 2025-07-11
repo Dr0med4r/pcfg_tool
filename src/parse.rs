@@ -62,10 +62,6 @@ pub fn parse(
             .expect("initial nonterminal is not in the rules") as u32,
     );
     rule_lookup.entry(initial_nonterminal).or_default();
-    let mut rule_lookup_vec = vec![vec![]; rule_lookup.len()];
-    for (item, set) in rule_lookup {
-        rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
-    }
 
     let scores = astar.as_ref().map(|astar| {
         ViterbiScore::new_from_file(astar, &string_lookup)
@@ -79,7 +75,7 @@ pub fn parse(
         if let Some(line_items) = transform_sentence(&line, &string_lookup, unking, smoothing) {
             let rule_weights = deduce(
                 &line_items,
-                &rule_lookup_vec,
+                &rule_lookup,
                 scores.as_ref(),
                 initial_nonterminal,
                 string_lookup.len(),
@@ -217,7 +213,7 @@ pub fn transform_sentence(
 
 pub fn deduce(
     line: &[Item],
-    rule_lookup: &[Vec<Rule<Item>>],
+    rule_lookup: &HashMap<Item, HashSet<Rule<Item>>>,
     scores: Option<&ViterbiScore>,
     start_item: Item,
     number_of_items: usize,
@@ -227,7 +223,7 @@ pub fn deduce(
     let mut weight_map = WeightMap::with_capacity(number_of_items, sentence_length);
     for (index, word) in line.iter().enumerate() {
         for rule in rule_lookup
-            .get(usize::from(*word))
+            .get(word)
             .expect("there is no rule that produces the word")
         {
             queue.push(
@@ -251,7 +247,7 @@ pub fn deduce(
         }
         // iterate over all rules with the item on the right
         for rule in rule_lookup
-            .get(usize::from(consequence.item))
+            .get(&consequence.item)
             .expect("there should be a rule with each nonterminal")
         {
             match rule.rhs {
@@ -562,10 +558,6 @@ mod test {
         }
         let initial = Item::NonTerminal(string_map.get("ROOT").unwrap() as u32);
         grammar.entry(initial).or_default();
-        let mut rule_lookup_vec = vec![vec![]; grammar.len()];
-        for (item, set) in grammar {
-            rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
-        }
 
         let line = transform_sentence("R S T", &string_map, &false, &false).unwrap();
         let mut desired_weight_map = WeightMap::with_capacity(string_map.len(), line.len());
@@ -605,7 +597,7 @@ mod test {
             end: 2,
             weight: 0.05,
         });
-        let weight_map = deduce(&line, &rule_lookup_vec, None, initial, string_map.len());
+        let weight_map = deduce(&line, &grammar, None, initial, string_map.len());
         assert_eq!(weight_map, desired_weight_map);
     }
 }
