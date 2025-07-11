@@ -131,6 +131,7 @@ impl ViterbiScore {
                 self.r#in[item_pos] = rules_with_item
                     .unwrap()
                     .values()
+                    // use NotNan for ordering
                     .map(|f| NotNan::new(*f).unwrap())
                     .max()
                     .unwrap_or_else(|| {
