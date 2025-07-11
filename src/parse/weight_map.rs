@@ -12,6 +12,15 @@ pub enum Item {
     Terminal(u32),
 }
 
+impl Item {
+    pub fn is_nonterminal(&self) -> bool {
+        match self {
+            Item::NonTerminal(_) => true,
+            Item::Terminal(_) => false,
+        }
+    }
+}
+
 impl Default for Item {
     fn default() -> Self {
         Self::NonTerminal(0)

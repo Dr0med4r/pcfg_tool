@@ -45,7 +45,8 @@ pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonte
         .get(initial_nonterminal)
         .expect("initial nonterminal not in grammar");
 
-    let mut score = ViterbiScore::new(all_rules, rule_lookup, all_items, initial_nonterminal);
+    let len = string_lookup.len();
+    let mut score = ViterbiScore::new(all_rules, rule_lookup, all_items, initial_nonterminal, len);
     score.calculate_outside();
     score.print_weights(&mut weights_location, string_lookup);
 }
@@ -64,8 +65,8 @@ impl ViterbiScore {
         rule_lookup: HashMap<Item, HashSet<Rule<Item>>>,
         all_items: Vec<Item>,
         initial_nonterminal: usize,
+        len: usize,
     ) -> Self {
-        let len = all_items.len();
         let mut out = vec![0f64; len];
         let all_items = all_items
             .into_iter()
@@ -125,7 +126,11 @@ impl ViterbiScore {
             } else {
                 self.r#in[item_pos] = rules_with_item
                     .unwrap()
-                    .values()
+                    .iter()
+                    .filter_map(|(rhs, f)| match *rhs {
+                        Rhs::Unary(e) => (!e.is_nonterminal()).then_some(f),
+                        Rhs::Binary(_, _) => None,
+                    })
                     // use NotNan for ordering
                     .map(|f| NotNan::new(*f).unwrap())
                     .max()
@@ -139,18 +144,15 @@ impl ViterbiScore {
             for item in &self.all_nonterminals {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
-                if let Some(rules) = self.rule_lookup.get(item) {
+                if let Some(rules) = self.all_rules.get(item) {
                     for rule in rules {
-                        let new_weight = self
-                            .all_rules
-                            .get(&rule.lhs)
-                            .unwrap()
-                            .get(&rule.rhs)
-                            .unwrap()
-                            * match rule.rhs {
-                                Rhs::Unary(item) => self.get_inside(item),
+                        let new_weight = rule.1
+                            * match rule.0 {
+                                Rhs::Unary(item) => {
+                                    self.get_inside(*item)
+                                },
                                 Rhs::Binary(first, second) => {
-                                    self.get_inside(first) * self.get_inside(second)
+                                    self.get_inside(*first) * self.get_inside(*second)
                                 }
                             };
                         if new_weight > weight {
