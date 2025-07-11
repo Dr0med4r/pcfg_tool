@@ -7,10 +7,10 @@ make
 #     ./pcfg_tool binarise | \
 #     ./pcfg_tool induce grammar
 #
-# echo "viterbi outside..."
-# ./pcfg_tool outside ./training/large/grammar.rules ./training/large/grammar.lexicon grammar
+echo "viterbi outside..."
+./pcfg_tool outside ./training/small/grammar.rules ./training/small/grammar.lexicon grammar
 
 echo "parsing..."
-head -3 ./training/large/testsentences | \
-    ./pcfg_tool parse ./training/large/grammar.rules ./training/large/grammar.lexicon  | \
+cat ./training/small/sentences | \
+    ./pcfg_tool parse ./training/small/grammar.rules ./training/small/grammar.lexicon -a grammar.outside | \
     pv --line-mode > out.mrg

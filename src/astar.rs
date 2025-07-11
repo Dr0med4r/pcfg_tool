@@ -59,7 +59,7 @@ pub struct ViterbiScore {
     out: Vec<f64>,
     all_rules: HashMap<Item, HashMap<Rhs<Item>, f64>>,
     rule_lookup: Vec<Vec<Rule<Item>>>,
-    all_items: Vec<Item>,
+    all_nonterminals: Vec<Item>,
 }
 
 impl ViterbiScore {
@@ -71,13 +71,20 @@ impl ViterbiScore {
     ) -> Self {
         let len = all_items.len();
         let mut out = vec![0f64; len];
+        let all_items = all_items
+            .into_iter()
+            .filter(|e| match *e {
+                Item::NonTerminal(_) => true,
+                Item::Terminal(_) => false,
+            })
+            .collect();
         out[initial_nonterminal] = 1f64;
         Self {
             r#in: vec![0f64; len],
             out,
             all_rules,
             rule_lookup,
-            all_items,
+            all_nonterminals: all_items,
         }
     }
 
@@ -88,7 +95,7 @@ impl ViterbiScore {
             out: vec![0f64; string_lookup.len()],
             all_rules: HashMap::default(),
             rule_lookup: vec![],
-            all_items: vec![],
+            all_nonterminals: vec![],
         };
         for line in io::BufReader::new(file).lines().map_while(Result::ok) {
             let (item, score) = line
@@ -114,13 +121,11 @@ impl ViterbiScore {
     }
 
     fn calculate_inside(&mut self) {
-        for item in self.all_items.iter().filter(|e| match **e {
-            Item::NonTerminal(_) => true,
-            Item::Terminal(_) => false,
-        }) {
+        for item in &self.all_nonterminals {
             let item_pos = usize::from(*item);
             let rules_with_item = self.all_rules.get(item);
             if rules_with_item.is_none() {
+                eprintln!("why??");
                 self.r#in[item_pos] = 0f64;
             } else {
                 self.r#in[item_pos] = rules_with_item
@@ -128,17 +133,17 @@ impl ViterbiScore {
                     .values()
                     .map(|f| NotNan::new(*f).unwrap())
                     .max()
-                    .unwrap_or_else(|| NotNan::new(0f64).unwrap())
+                    .unwrap_or_else(|| {
+                        eprintln!("why??");
+                        NotNan::new(0f64).unwrap()
+                    })
                     .into();
             }
         }
         let mut changed = true;
         while changed {
             changed = false;
-            for item in self.all_items.iter().filter(|e| match **e {
-                Item::NonTerminal(_) => true,
-                Item::Terminal(_) => false,
-            }) {
+            for item in &self.all_nonterminals {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
                 for rule in &self.rule_lookup[item_pos] {
@@ -171,14 +176,12 @@ impl ViterbiScore {
         let mut changed = true;
         while changed {
             changed = false;
-            for item in self.all_items.iter().filter(|e| match **e {
-                Item::NonTerminal(_) => true,
-                Item::Terminal(_) => false,
-            }) {
+            for item in &self.all_nonterminals {
                 let item_pos = usize::from(*item);
                 let mut weight = 0f64;
                 for rule in &self.rule_lookup[item_pos] {
                     let new_weight = self.get_outside(rule.lhs)
+                    // inside of children
                         * match rule.rhs {
                             Rhs::Unary(_) => 1f64,
                             Rhs::Binary(first, second) => {
@@ -189,6 +192,7 @@ impl ViterbiScore {
                                 }
                             }
                         }
+                    // weight of rule
                         * self
                             .all_rules
                             .get(&rule.lhs)
@@ -208,10 +212,7 @@ impl ViterbiScore {
     }
 
     fn print_weights(&self, weights_location: &mut Box<dyn Write>, string_lookup: StringLookup) {
-        for item in self.all_items.iter().filter(|e| match **e {
-            Item::NonTerminal(_) => true,
-            Item::Terminal(_) => false,
-        }) {
+        for item in &self.all_nonterminals {
             let item_string = string_lookup
                 .get_string(usize::from(*item))
                 .expect("should not be possible");
