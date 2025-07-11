@@ -41,7 +41,7 @@ pub fn out(rules: &Path, lexicon: &Path, grammar: &Option<String>, initial_nonte
         false,
     );
     let all_items: Vec<Item> = rule_lookup.keys().map(Item::clone).collect();
-    let mut rule_lookup_vec = vec![vec![]; rule_lookup.len()];
+    let mut rule_lookup_vec = vec![vec![]; string_lookup.len()];
     for (item, set) in rule_lookup {
         rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
     }

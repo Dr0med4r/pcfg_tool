@@ -76,26 +76,31 @@ pub fn parse(
             eprintln!("error reading line {}", line_number + 1);
             exit(1);
         };
-        let line_items = transform_sentence(&line, &string_lookup, unking, smoothing);
-        let rule_weights = deduce(
-            &line_items,
-            &rule_lookup_vec,
-            scores.as_ref(),
-            initial_nonterminal,
-            string_lookup.len(),
-        );
-        if rule_weights.get_with_index(initial_nonterminal, 0, line_items.len() as u32) == 0.0 {
-            println!("(NOPARSE {})", line)
-        } else {
-            let tree = rule_weights.convert_to_parse_tree(
+        if let Some(line_items) = transform_sentence(&line, &string_lookup, unking, smoothing) {
+            let rule_weights = deduce(
+                &line_items,
+                &rule_lookup_vec,
+                scores.as_ref(),
                 initial_nonterminal,
-                0,
-                line_items.len() as u32,
-                &string_lookup,
-                &all_rules,
-                &mut line_items.into(),
+                string_lookup.len(),
             );
-            println!("{tree}")
+            if rule_weights.get_with_index(initial_nonterminal, 0, line_items.len() as u32) == 0.0 {
+                println!("(NOPARSE {})", line)
+            } else {
+                let tree = rule_weights.convert_to_parse_tree(
+                    initial_nonterminal,
+                    0,
+                    line_items.len() as u32,
+                    &string_lookup,
+                    &all_rules,
+                    &mut line.split_whitespace().collect(),
+                );
+                println!("{tree}")
+            }
+        } else {
+            eprintln!("Not all Tokens are in the grammar");
+            println!("(NOPARSE {})", line);
+
         }
     }
 }
@@ -182,7 +187,7 @@ pub fn transform_sentence(
     lexicon: &StringLookup,
     unking: &bool,
     smoothing: &bool,
-) -> Vec<Item> {
+) -> Option<Vec<Item>> {
     line.split_whitespace()
         .map(|word| {
             let word_id = match lexicon.get(word) {
@@ -201,11 +206,11 @@ pub fn transform_sentence(
                         })
                     } else {
                         eprintln!("'{}' is not in the lexicon. Maybe use unking", word);
-                        exit(1)
+                        return None;
                     }
                 }
             } as u32;
-            Item::Terminal(word_id)
+            Some(Item::Terminal(word_id))
         })
         .collect()
 }
@@ -562,7 +567,7 @@ mod test {
             rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
         }
 
-        let line = transform_sentence("R S T", &string_map, &false, &false);
+        let line = transform_sentence("R S T", &string_map, &false, &false).unwrap();
         let mut desired_weight_map = WeightMap::with_capacity(string_map.len(), line.len());
         // R: 0
         // W1: 1
@@ -600,7 +605,7 @@ mod test {
             end: 2,
             weight: 0.05,
         });
-        let weight_map = deduce(&line, &rule_lookup_vec,None, initial, string_map.len());
+        let weight_map = deduce(&line, &rule_lookup_vec, None, initial, string_map.len());
         assert_eq!(weight_map, desired_weight_map);
     }
 }

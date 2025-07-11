@@ -202,7 +202,7 @@ impl WeightMap<f64> {
         end: u32,
         string_lookup: &StringLookup,
         all_rules: &HashMap<Item, HashMap<Rhs<Item>, f64>>,
-        line: &mut VecDeque<Item>,
+        line: &mut VecDeque<&str>,
     ) -> ParseTree<String> {
         let root = string_lookup
             .get_string(usize::from(initial))
@@ -233,10 +233,7 @@ impl WeightMap<f64> {
                         Item::Terminal(_) => {
                             if *weight_of_rule == weight_of_lhs {
                                 let child = ParseTree {
-                                    root: string_lookup
-                                        .get_string(usize::from(line.pop_front().unwrap()))
-                                        .unwrap()
-                                        .clone(),
+                                    root: line.pop_front().unwrap().to_string(),
                                     children: vec![],
                                 };
                                 children.push(child);
@@ -417,7 +414,7 @@ mod test {
         for (item, set) in grammar {
             rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
         }
-        let line = transform_sentence("T S", &string_map, &false, &false);
+        let line = transform_sentence("T S", &string_map, &false, &false).unwrap();
         let weight_map = deduce(&line, &rule_lookup_vec, None, initial, string_map.len());
         let tree = weight_map.convert_to_parse_tree(
             initial,
@@ -425,7 +422,7 @@ mod test {
             line.len() as u32,
             &string_map,
             &all_rules,
-            &mut line.into(),
+            &mut vec!["T", "S"].into(),
         );
         let desired_tree = ParseTree {
             root: "ROOT".to_string(),
@@ -478,7 +475,7 @@ mod test {
         for (item, set) in grammar {
             rule_lookup_vec[u32::from(item) as usize] = set.into_iter().collect()
         }
-        let line = transform_sentence("R S T", &string_map, &false, &false);
+        let line = transform_sentence("R S T", &string_map, &false, &false).unwrap();
         let weight_map = deduce(&line, &rule_lookup_vec, None, initial, string_map.len());
         weight_map.convert_to_parse_tree(
             initial,
@@ -486,7 +483,7 @@ mod test {
             line.len() as u32,
             &string_map,
             &all_rules,
-            &mut line.into(),
+            &mut vec!["R", "S", "T"].into(),
         );
     }
 }
